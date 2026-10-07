@@ -14,6 +14,7 @@ import shutil
 import signal
 import subprocess
 import threading
+import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
@@ -187,15 +188,34 @@ class GitRunner:
         cmd = self.command(args, cwd)
         if self._closed:
             return GitResult(-1, b"", b"repotray is shutting down", False, cmd)
+        ssh = None
+        remaining = timeout
         # Only fetches and actions reach a remote, so only they need the repo's ssh command.
-        ssh = self.configured_ssh(cwd) if kind in (CallKind.FETCH, CallKind.ACTION) else None
+        # Reading it is part of the call: it spends the same time budget, so a hanging git
+        # still ends the whole call after ``timeout``.
+        if kind in (CallKind.FETCH, CallKind.ACTION):
+            start = time.monotonic()
+            ssh = self.configured_ssh(cwd, min(SSH_QUERY_TIMEOUT, timeout))
+            remaining = timeout - (time.monotonic() - start)
+            if remaining <= 0:
+                return GitResult(-9, b"", self._timed_out(timeout), True, cmd)
+        env = git_environment(kind, extra=self.extra_env, ssh_command=ssh)
+        return self._run(cmd, env, remaining, timeout)
+
+    @staticmethod
+    def _timed_out(timeout: float) -> bytes:
+        return f"timed out after {timeout:g} s".encode()
+
+    def _run(
+        self, cmd: tuple[str, ...], env: dict[str, str], remaining: float, timeout: float
+    ) -> GitResult:
         try:
             proc = subprocess.Popen(
                 cmd,
                 stdin=subprocess.DEVNULL,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                env=git_environment(kind, extra=self.extra_env, ssh_command=ssh),
+                env=env,
                 **self.popen_kwargs(),
             )
         except FileNotFoundError:
@@ -205,7 +225,7 @@ class GitRunner:
         with self._lock:
             self._procs.add(proc)
         try:
-            out, err = proc.communicate(timeout=timeout)
+            out, err = proc.communicate(timeout=remaining)
             return GitResult(proc.returncode, out, err, False, cmd)
         except subprocess.TimeoutExpired:
             self.kill_tree(proc)
@@ -214,33 +234,25 @@ class GitRunner:
             except subprocess.TimeoutExpired:
                 proc.kill()
                 out, err = proc.communicate()
-            msg = f"timed out after {timeout:g} s".encode()
-            return GitResult(-9, out, (err + b"\n" + msg).strip(), True, cmd)
+            return GitResult(-9, out, (err + b"\n" + self._timed_out(timeout)).strip(), True, cmd)
         finally:
             with self._lock:
                 self._procs.discard(proc)
 
-    def configured_ssh(self, cwd: Path) -> str | None:
+    def configured_ssh(self, cwd: Path, timeout: float = SSH_QUERY_TIMEOUT) -> str | None:
         """The repo's effective ``core.sshCommand`` (local, global or system config), read for
         every network call so a config change applies at once; None when unset, when the
-        environment already chooses the ssh program, or when git cannot tell."""
+        environment already chooses the ssh program, or when git cannot tell. Runs like any
+        git call (process group, killed with its children on timeout, stopped by kill_all)."""
         if ssh_overridden({**os.environ, **self.extra_env}):
             return None
-        try:
-            cp = subprocess.run(
-                [self.git, "-C", str(cwd), "config", "--get", "core.sshCommand"],
-                stdin=subprocess.DEVNULL,
-                capture_output=True,
-                timeout=SSH_QUERY_TIMEOUT,
-                env=git_environment(CallKind.QUERY, extra=self.extra_env),
-                check=False,
-                **self.popen_kwargs(),
-            )
-        except (OSError, subprocess.TimeoutExpired) as exc:
-            log.warning("reading core.sshCommand in %s failed (%s); using plain ssh", cwd, exc)
+        res = self(["config", "--get", "core.sshCommand"], cwd, timeout, kind=CallKind.QUERY)
+        # 1 = not set. git missing (127) and shutdown (-1) are reported by the call itself.
+        if res.timed_out or res.returncode not in (0, 1, 127, -1):
+            log.warning("reading core.sshCommand in %s failed: %s", cwd, res.err.strip())
             return None
-        value = cp.stdout.decode("utf-8", errors="replace").strip()
-        return value if cp.returncode == 0 and value else None
+        value = res.out.strip()
+        return value if res.returncode == 0 and value else None
 
     def kill_all(self) -> None:
         """Stop accepting work and kill every running git process (shutdown)."""

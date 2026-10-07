@@ -58,17 +58,37 @@ def test_runner_command_and_missing_git(tmp_path):
     )
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="shebang script")
-def test_runner_timeout_kills_group(tmp_path):
-    script = tmp_path / "fake-git"
-    script.write_text(f"#!{sys.executable}\nimport time, subprocess, sys\n"
-                      "subprocess.Popen(['sleep', '30'])\ntime.sleep(30)\n")  # fmt: skip
-    script.chmod(0o755)
-    r = GitRunner(git=str(script))
+def fake_git(tmp_path: Path, body: str) -> str:
+    """A program that runs ``body`` (Python) whatever git arguments it gets."""
+    script = tmp_path / "fake_git.py"
+    script.write_text(body)
+    if sys.platform == "win32":
+        launcher = tmp_path / "fake-git.cmd"
+        launcher.write_text(f'@"{sys.executable}" "{script}" %*\r\n')
+    else:
+        launcher = tmp_path / "fake-git"
+        launcher.write_text(f"#!/bin/sh\nexec '{sys.executable}' '{script}' \"$@\"\n")
+        launcher.chmod(0o755)
+    return str(launcher)
+
+
+HANG = (
+    "import subprocess, sys, time\n"
+    "subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(30)'])\n"
+    "time.sleep(30)\n"
+)
+
+
+@pytest.mark.parametrize("kind", [CallKind.ACTION, CallKind.FETCH, CallKind.STATUS])
+def test_runner_timeout_kills_group(tmp_path, kind, monkeypatch):
+    # Fetches and actions first read core.sshCommand: that must spend the same time budget.
+    monkeypatch.delenv("GIT_SSH_COMMAND", raising=False)
+    monkeypatch.delenv("GIT_SSH", raising=False)
+    r = GitRunner(git=fake_git(tmp_path, HANG))
     t = time.monotonic()
-    res = r(["x"], tmp_path, 0.5, kind=CallKind.ACTION)
+    res = r(["x"], tmp_path, 0.5, kind=kind)
     assert res.timed_out and time.monotonic() - t < 5
-    assert "timed out" in res.err
+    assert "timed out after 0.5 s" in res.err
 
 
 def test_first_line_and_credentials():
