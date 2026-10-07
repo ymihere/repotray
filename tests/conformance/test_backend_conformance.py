@@ -174,6 +174,8 @@ def test_call_soon_runs_on_ui_thread_and_quit_returns(backend):
         backend.quit()
         t.join(2)
         assert not t.is_alive() and time.monotonic() - start < 2
+    # A backend may run callbacks on its own UI thread (pystray: a queue worker).
+    ui_thread = getattr(backend, "ui_thread", None) or ui_thread
     assert seen and seen[0] is ui_thread
 
 

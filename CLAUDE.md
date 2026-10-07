@@ -10,8 +10,8 @@ click opens a panel with push / pull / sync buttons.
 - **`CLAUDE.local.md`** (gitignored, may be absent) — facts about the maintainer's dev machine.
 
 ## Status (2026-10-07)
-M0–M3 done (core, CLI, icons, XApp backend + GTK panel, verified live on Cinnamon with --demo).
-Next: PLAN.md milestone M4. Implementation choices are
+M0–M4 done (core, CLI, icons, XApp/AppIndicator/GtkStatusIcon/pystray backends, GTK panel,
+verified live on Cinnamon with --demo). Next: PLAN.md milestone M5. Implementation choices are
 logged in `docs/decisions.md`.
 
 ## Decisions already made

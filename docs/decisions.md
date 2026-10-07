@@ -53,6 +53,24 @@ Format: date — question → choice (reason).
   several states (used while the screen was locked, and for doc screenshots).
 - 2026-10-07 — The instance lock file is never unlinked on exit (unlinking races a starting
   instance); `repotray quit` checks that the lock is actually held before trusting the pid.
+- 2026-10-07 — M4 live results on Linux Mint 22.3 Cinnamon (X11), all with `--demo`:
+  - `xapp` (score 100, auto-selected): icon, label, markup tooltip, panel, control menu — M3 checks.
+  - `appindicator` (80): shown through `xapp-sn-watcher` as an XApp icon with both dots; **no
+    label** (the watcher does not forward SNI labels). A simulated left click on the watcher's proxy
+    object opened the fallback menu (Open panel…, Sync/Push/Pull items, groups, Sync all, control
+    items).
+  - `gtkstatusicon` (20): shown in the XEmbed area at 24 px with both dots (a `Gdk-CRITICAL`
+    thaw warning is printed by GTK at startup; harmless). Click not simulated (no D-Bus hook;
+    real mouse clicks were not used to avoid moving the maintainer's pointer).
+  - `pystray` (10): shown via pystray's own AppIndicator path as a full-colour 64 px raster. Click
+    not simulated.
+- 2026-10-07 — pystray: no default menu item, so on Windows the left click does nothing and the
+  right click opens the menu; macOS status-item titles (counts next to the icon) are not reachable
+  through pystray, so counts live in the tooltip and menu there. Both are porting opportunities.
+- 2026-10-07 — pystray's "UI thread" is the backend's queue worker (`backend.ui_thread`); the
+  conformance suite accepts a backend-declared UI thread.
+- 2026-10-07 — `gtkstatusicon` anchors the panel from `get_geometry()`: bottom/top/left/right is
+  inferred from where the icon sits on its monitor.
 
 ## Blocked / unverified
 - 2026-10-07 — **Live tray screenshots (M2, M3) while the session is locked.** The maintainer's
@@ -65,3 +83,4 @@ Format: date — question → choice (reason).
 - Clicks were simulated over D-Bus (`scripts/dev/click-tray.sh`), never with a real mouse: a real
   click first moves focus to the panel applet, which the 300 ms reopen guard handles (unit-tested,
   not observed live).
+- macOS and Windows platforms and the pystray backend there were only unit-tested with mocks.
