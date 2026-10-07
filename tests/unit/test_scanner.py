@@ -25,7 +25,7 @@ def cfg(root: Path, **kw) -> Config:
 def found(config: Config) -> set[str]:
     paths, _ = find_repo_paths(config)
     root = Path(config.roots[0]).resolve() if config.roots else Path("/")
-    return {str(p.relative_to(root)) if p.is_relative_to(root) else str(p) for p in paths}
+    return {p.relative_to(root).as_posix() if p.is_relative_to(root) else str(p) for p in paths}
 
 
 def test_depth_limit(tmp_path):

@@ -48,7 +48,7 @@ def test_runner_command_and_missing_git(tmp_path):
     assert GitRunner().command(["status"], Path("/x"))[:7] == (
         "git",
         "-C",
-        "/x",
+        str(Path("/x")),
         "-c",
         "gc.auto=0",
         "-c",

@@ -113,7 +113,7 @@ class BasePlatform:
 
     def read_lock_pid(self, path: Path) -> int | None:
         try:
-            text = path.read_text().strip()
+            text = path.read_text("utf-8").strip()
         except OSError:
             return None
         return int(text) if text.isdigit() else None

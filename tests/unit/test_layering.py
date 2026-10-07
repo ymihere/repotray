@@ -46,4 +46,4 @@ def test_no_toolkit_import_statements():
     pattern = re.compile(r"^\s*(import|from)\s+(gi|pystray|PIL)\b", re.M)
     for mod in headless_modules():
         path = SRC.joinpath(*mod.split(".")[1:]).with_suffix(".py")
-        assert not pattern.search(path.read_text()), f"{path} imports a GUI toolkit"
+        assert not pattern.search(path.read_text("utf-8")), f"{path} imports a GUI toolkit"

@@ -343,7 +343,7 @@ def cli(*args, config: Path, check_code: int | None = None):
 def cli_setup(pair, tmp_path):
     rf, mine, theirs = pair
     cfg = tmp_path / "config.toml"
-    cfg.write_text(f'roots = ["{rf.root}"]\n')
+    cfg.write_text(f"roots = ['{rf.root}']\n")
     return cfg, mine, theirs
 
 
@@ -418,7 +418,7 @@ def test_cli_ambiguous_name(remote_fixture, tmp_path):
         check=True,
     )
     cfg = tmp_path / "c.toml"
-    cfg.write_text(f'roots = ["{remote_fixture.root}"]\n')
+    cfg.write_text(f"roots = ['{remote_fixture.root}']\n")
     cp = cli("push", "tool", config=cfg, check_code=2)
     assert "ambiguous" in cp.stderr and "a/tool" in cp.stderr
     cli("push", "a/tool", config=cfg, check_code=1)  # resolves, nothing to push

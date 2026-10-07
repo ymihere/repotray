@@ -193,7 +193,7 @@ class LinuxPlatform(BasePlatform):
         dest = self.icon_dir()
         dest.mkdir(parents=True, exist_ok=True)
         manifest = self.icon_manifest()
-        recorded = set(manifest.read_text().splitlines()) if manifest.exists() else set()
+        recorded = set(manifest.read_text("utf-8").splitlines()) if manifest.exists() else set()
         copied: list[Path] = []
         for svg in sorted(src.glob("*.svg")):
             target = dest / svg.name
@@ -202,7 +202,7 @@ class LinuxPlatform(BasePlatform):
                 copied.append(target)
             recorded.add(str(target))
         manifest.parent.mkdir(parents=True, exist_ok=True)
-        manifest.write_text("".join(f"{p}\n" for p in sorted(recorded)))
+        manifest.write_text("".join(f"{p}\n" for p in sorted(recorded)), "utf-8")
         if copied:
             # Bump the theme directory's mtime so running GTK processes rescan it.
             os.utime(dest.parent.parent, None)
@@ -213,7 +213,7 @@ class LinuxPlatform(BasePlatform):
         if not manifest.exists():
             return []
         removed: list[Path] = []
-        for line in manifest.read_text().splitlines():
+        for line in manifest.read_text("utf-8").splitlines():
             p = Path(line)
             if p.name.startswith("repotray") and p.exists():
                 p.unlink()

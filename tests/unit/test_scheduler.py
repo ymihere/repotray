@@ -72,7 +72,8 @@ def setup(tmp_path):
     for n in ("alpha", "beta"):
         (root / n / ".git").mkdir(parents=True)
     cfgfile = tmp_path / "config.toml"
-    cfgfile.write_text(f'roots = ["{root}"]\nfetch_interval = 600\nstatus_interval = 60\n')
+    # TOML literal strings: Windows paths contain backslashes.
+    cfgfile.write_text(f"roots = ['{root}']\nfetch_interval = 600\nstatus_interval = 60\n")
     clock = Clock()
     git = FakeGit()
     sched = Scheduler(
@@ -223,7 +224,7 @@ def test_config_reload_triggers_rescan(setup, tmp_path):
     sched.startup()
     (root / "gamma" / ".git").mkdir(parents=True)
     cfgfile = sched.watcher.path
-    cfgfile.write_text(f'roots = ["{root}"]\nmax_depth = 3\n')
+    cfgfile.write_text(f"roots = ['{root}']\nmax_depth = 3\n")
     import os
 
     os.utime(cfgfile, (clock.wall + 100, clock.wall + 100))

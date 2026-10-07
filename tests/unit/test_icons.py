@@ -1,4 +1,5 @@
 import importlib.util
+import json
 import math
 import re
 import subprocess
@@ -89,10 +90,37 @@ def test_regenerated_output_matches_committed(tmp_path):
         check=True,
         capture_output=True,
     )
+    # GEOS builds differ in the last digits, so compare shapes, not bytes.
     for f in svgs():
-        assert (tmp_path / "symbolic" / f.name).read_text() == f.read_text(), f.name
+        new = tmp_path / "symbolic" / f.name
+        assert svg_structure(new) == svg_structure(f), f.name
+        for a, b in zip(svg_shapes(new), svg_shapes(f), strict=True):
+            assert a.symmetric_difference(b).area < 0.01, f.name
     assert len(list((tmp_path / "symbolic").iterdir())) == 102
-    assert (tmp_path / "geometry.json").read_text() == (data_dir() / "geometry.json").read_text()
+    old = json.loads((data_dir() / "geometry.json").read_text("utf-8"))
+    new = json.loads((tmp_path / "geometry.json").read_text("utf-8"))
+    assert old.keys() == new.keys() and old["dots"] == new["dots"]
+
+
+def svg_structure(path: Path) -> list[tuple]:
+    """Element tags and attributes other than path data."""
+    root = ET.parse(path).getroot()
+    return [(el.tag, sorted((k, v) for k, v in el.attrib.items() if k != "d")) for el in root]
+
+
+def svg_shapes(path: Path) -> list:
+    """Each <path> as a shapely geometry (even-odd fill)."""
+    from shapely.geometry import Polygon
+
+    shapes = []
+    for el in ET.parse(path).getroot().findall(f"{SVG_NS}path"):
+        shape = Polygon()
+        for ring in re.findall(r"M([^Z]+)Z", el.get("d")):
+            nums = [float(x) for x in re.findall(r"-?\d+(?:\.\d+)?", ring)]
+            pts = list(zip(nums[::2], nums[1::2], strict=True))
+            shape = shape.symmetric_difference(Polygon(pts).buffer(0))
+        shapes.append(shape)
+    return shapes
 
 
 def test_names_for_every_spec():
