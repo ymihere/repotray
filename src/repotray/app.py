@@ -191,6 +191,7 @@ class Controller:
             "open_terminal": lambda: self.open_terminal(path),
             "open_folder": lambda: self.open_folder(path),
             "copy_path": lambda: self.copy_path(path),
+            "show_incoming": lambda: self.show_incoming(path),
         }
         fn = handlers.get(action)
         if fn is None:
@@ -241,7 +242,7 @@ class Controller:
     def open_config(self) -> None:
         path = self.config_file()
         cfgmod.ensure_exists(path)
-        self.platform.open_file(path)
+        self.platform.open_file(path, self.config.editor)
 
     def _check_repo(self, path: Path) -> None:
         if not path.is_dir():
@@ -255,6 +256,46 @@ class Controller:
     def open_folder(self, path: Path) -> None:
         self._check_repo(path)
         self.platform.open_folder(path, self.config.file_manager)
+
+    def _repo(self, path: Path):
+        return next((s for s in self.snapshot.repos if s.path == path), None)
+
+    def show_incoming(self, path: Path) -> None:
+        """Show the commits a pull would bring; read off the UI thread, shown on it."""
+        st = self._repo(path)
+        name = st.name if st else path.name
+
+        def work() -> None:
+            log = self.scheduler.incoming(path)
+            self.backend.call_soon(lambda: self._present_incoming(path, name, st, log))
+
+        threading.Thread(target=work, name="repotray-log", daemon=True).start()
+
+    def _present_incoming(self, path: Path, name: str, st, log) -> None:
+        if log.error:
+            self.notify(f"{name}: cannot list incoming commits", log.error)
+            return
+        show = getattr(self.backend, "show_commits", None)
+        if show is None:
+            self.open_incoming_in_editor(name, st, log)
+            return
+        title = f"{name}: {log.total} incoming commit{'s' if log.total != 1 else ''}"
+        if st is not None and st.branch and st.upstream:
+            subtitle = f"{st.upstream} → {st.branch}, as of the last fetch"
+        else:
+            subtitle = "as of the last fetch"
+        show(title, subtitle, log, lambda: self.open_incoming_in_editor(name, st, log))
+
+    def open_incoming_in_editor(self, name: str, st, log) -> Path:
+        """Write the full log to a text file and open it in the editor (config `editor`)."""
+        safe = "".join(c if c.isalnum() or c in "-_." else "_" for c in name)
+        out = self.platform.cache_dir() / f"incoming-{safe}.txt"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        where = f" ({st.upstream} → {st.branch})" if st is not None and st.upstream else ""
+        header = f"{name}{where}: {log.total} incoming commit{'s' if log.total != 1 else ''}"
+        out.write_text(f"{header}\n{'=' * len(header)}\n\n{log.text}", "utf-8")
+        self.platform.open_file(out, self.config.editor)
+        return out
 
     def copy_path(self, path: Path) -> None:
         self.backend.copy_to_clipboard(str(path))

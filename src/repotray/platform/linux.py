@@ -64,10 +64,11 @@ def _gsettings(schema: str, key: str) -> str | None:
 class LinuxPlatform(BasePlatform):
     name = "linux"
 
-    def __init__(self, which=shutil.which, run_spawn=spawn, gsettings=_gsettings) -> None:
+    def __init__(self, which=shutil.which, run_spawn=spawn, gsettings=_gsettings, env=None) -> None:
         self.which = which
         self.spawn = run_spawn
         self.gsettings = gsettings
+        self.env = os.environ if env is None else env
 
     # --- directories ---
     def config_dir(self) -> Path:
@@ -123,20 +124,92 @@ class LinuxPlatform(BasePlatform):
         return InstanceLock(path, fd, release)
 
     # --- opening things ---
+    def _desktops(self) -> list[str]:
+        return [d.lower() for d in self.env.get("XDG_CURRENT_DESKTOP", "").split(":") if d]
+
+    def preferred_terminal(self) -> str | None:
+        """The terminal the desktop is set to use (Linux Mint: Preferred Applications)."""
+        desktops = self._desktops()
+        schemas = []
+        if any("cinnamon" in d for d in desktops):
+            schemas.append(("org.cinnamon.desktop.default-applications.terminal", "exec"))
+        if "mate" in desktops:
+            schemas.append(("org.mate.applications-terminal", "exec"))
+        if any(d in ("gnome", "unity", "budgie", "pantheon") for d in desktops):
+            schemas.append(("org.gnome.desktop.default-applications.terminal", "exec"))
+        for schema, key in schemas:
+            value = self.gsettings(schema, key)
+            if value:
+                return value
+        return self._xdg_terminals_list()
+
+    def _xdg_terminals_list(self) -> str | None:
+        """First entry of the XDG Default Terminal list (xdg-terminals.list), as a command."""
+        home = self.env.get("XDG_CONFIG_HOME")
+        config_home = Path(home) if home and os.path.isabs(home) else Path.home() / ".config"
+        dirs = [config_home] + [
+            Path(d) for d in self.env.get("XDG_CONFIG_DIRS", "/etc/xdg").split(":") if d
+        ]
+        names = [f"{d}-xdg-terminals.list" for d in self._desktops()] + ["xdg-terminals.list"]
+        for directory in dirs:
+            for name in names:
+                try:
+                    lines = (directory / name).read_text("utf-8").splitlines()
+                except OSError:
+                    continue
+                for line in lines:
+                    entry = line.strip().split(":")[0]
+                    if entry and not entry.startswith(("#", "-")):
+                        cmd = self._desktop_exec(entry)
+                        if cmd:
+                            return cmd
+        return None
+
+    def _desktop_exec(self, desktop_id: str) -> str | None:
+        """The executable a .desktop entry runs (first word of Exec=)."""
+        data_dirs = [self.data_home()] + [
+            Path(d)
+            for d in self.env.get("XDG_DATA_DIRS", "/usr/local/share:/usr/share").split(":")
+            if d
+        ]
+        for d in data_dirs:
+            try:
+                text = (d / "applications" / desktop_id).read_text("utf-8")
+            except OSError:
+                continue
+            for line in text.splitlines():
+                if line.startswith("Exec="):
+                    parts = line[5:].split()
+                    return parts[0] if parts else None
+        return None
+
+    def _template_for(self, command: str) -> str | None:
+        """Working-directory template for a terminal command, following x-terminal-emulator."""
+        path = self.which(command) if not os.path.isabs(command) else command
+        if not path:
+            return None
+        names = [os.path.basename(command), os.path.basename(os.path.realpath(path))]
+        known = dict(TERMINALS)
+        for name in names:
+            for binary, template in known.items():
+                if name == binary or name.startswith(binary + "."):
+                    return template
+        return command  # unknown terminal: started in the repository as its cwd
+
     def terminal_template(self, configured: str) -> str:
+        """config `terminal` > the desktop's preferred terminal > xdg-terminals.list >
+        x-terminal-emulator > the first known terminal installed."""
         if configured:
             return configured
-        known = dict(TERMINALS)
-        xte = self.which("x-terminal-emulator")
-        if xte:
-            target = os.path.basename(os.path.realpath(xte))
-            for name in known:
-                if target == name or target.startswith(name + "."):
-                    return known[name]
+        for command in (self.preferred_terminal(), "x-terminal-emulator"):
+            if command:
+                template = self._template_for(command)
+                if template:
+                    return template
         for binary, template in TERMINALS:
             if self.which(binary):
                 return template
-        return "x-terminal-emulator" if xte else ""
+        return ""
 
     def open_terminal(self, path: Path, template: str) -> None:
         tmpl = self.terminal_template(template)
@@ -148,8 +221,10 @@ class LinuxPlatform(BasePlatform):
         argv = split_template(template, path) if template else ["xdg-open", str(path)]
         self.spawn(argv, cwd=path)
 
-    def open_file(self, path: Path) -> None:
-        self.spawn(["xdg-open", str(path)])
+    def open_file(self, path: Path, template: str = "") -> None:
+        """Open a text file in the configured editor, else the desktop's default app."""
+        argv = split_template(template, path) if template else ["xdg-open", str(path)]
+        self.spawn(argv)
 
     def notify(self, title: str, body: str) -> bool:
         if not self.which("notify-send"):

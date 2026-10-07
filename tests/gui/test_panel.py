@@ -66,6 +66,16 @@ class GtkTestBackend(FakeBackend):
         super().set_menus(control, fallback)
         self.panel.set_control_menu(control)
 
+    def show_commits(self, title, subtitle, log, on_open_editor):
+        from repotray.ui.gtk3.commits import CommitsDialog
+
+        def make(parent):
+            self.dialog = CommitsDialog(parent, title, subtitle, log, on_open_editor)
+            self.dialog.present()
+            return self.dialog
+
+        self.panel.track_dialog(make)
+
 
 @pytest.fixture
 def ui(tmp_path):
@@ -233,3 +243,25 @@ def test_placement_on_screen(ui):
     wa = display.get_monitor_at_point(4000, 1400).get_workarea()
     assert wa.x <= x and x + w <= wa.x + wa.width
     assert wa.y <= y and y + h <= wa.y + wa.height
+
+
+def test_incoming_commits_dialog_keeps_panel_open(ui, monkeypatch):
+    ctl, panel = ui
+    opened = []
+    monkeypatch.setattr(ctl.platform, "open_file", lambda p, t="": opened.append((p, t)))
+    monkeypatch.setattr(ctl.platform, "cache_dir", lambda: ctl.scheduler.watcher.path.parent)
+    panel.show_at(Anchor(4000, 1400, "bottom"))
+    pump(0.3)
+    website = next(s for s in ctl.snapshot.repos if s.name == "website")
+    ctl.dispatch("show_incoming", website.path)
+    be = ctl.backend
+    assert pump(3.0, lambda: getattr(be, "dialog", None) is not None)
+    buf = be.dialog.view.get_buffer()
+    text = buf.get_text(buf.get_start_iter(), buf.get_end_iter(), False)
+    assert "Fix race in session refresh" in text and "Ada Example" in text
+    pump(0.5)
+    assert panel.get_visible()  # the dialog does not close the panel
+    be.dialog.response(1)  # Open in editor
+    assert opened and opened[0][0].name == "incoming-website.txt"
+    be.dialog.response(Gtk.ResponseType.CLOSE)
+    pump(0.3)

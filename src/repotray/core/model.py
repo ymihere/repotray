@@ -65,6 +65,7 @@ class Cell:
     dirty: bool
     warning: str | None
     button: Button
+    menu: tuple[MenuItem, ...] = ()  # context menu of the repo name
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,6 +81,7 @@ class Chip:
     path: Path
     name: str
     tooltip: str
+    menu: tuple[MenuItem, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -320,6 +322,7 @@ def _cell(s: RepoState, snapshot: Snapshot, config: Config, side: str) -> Cell:
         dirty=s.dirty(config.count_untracked_as_dirty),
         warning=_warning(snapshot, s),
         button=button,
+        menu=repo_menu(s.path, s.behind if s.pullable else 0),
     )
 
 
@@ -359,7 +362,13 @@ def build_groups(snapshot: Snapshot, config: Config) -> tuple[Group, ...]:
 
     def chips(items: list[RepoState], tip=None) -> tuple[Chip, ...]:
         return tuple(
-            Chip(s.path, s.name, tip(s) if tip else repo_tooltip(s, config)) for s in items
+            Chip(
+                s.path,
+                s.name,
+                tip(s) if tip else repo_tooltip(s, config),
+                repo_menu(s.path, s.behind if s.pullable else 0),
+            )
+            for s in items
         )
 
     groups: list[Group] = []
@@ -542,8 +551,15 @@ def control_menu(snapshot: Snapshot, ui: UiState | None = None) -> tuple[MenuIte
     )
 
 
-def repo_menu(path: Path) -> tuple[MenuItem, ...]:
+def repo_menu(path: Path, behind: int = 0) -> tuple[MenuItem, ...]:
+    """The context menu of a repo name. ``behind`` > 0 adds the incoming-commits viewer."""
+    incoming = ()
+    if behind > 0:
+        label = f"Show incoming commits ({behind})…"
+        tip = "The commit messages a pull would bring, as of the last fetch"
+        incoming = (MenuItem(label, "show_incoming", path=path, tooltip=tip), MenuItem.sep())
     return (
+        *incoming,
         MenuItem("Open terminal here", "open_terminal", path=path),
         MenuItem("Open folder", "open_folder", path=path),
         MenuItem("Copy path", "copy_path", path=path),
@@ -601,8 +617,7 @@ def fallback_menu(
         items.append(MenuItem.sep())
         for g in groups:
             children = tuple(
-                MenuItem(ch.name, None, children=repo_menu(ch.path), tooltip=ch.tooltip)
-                for ch in g.chips
+                MenuItem(ch.name, None, children=ch.menu, tooltip=ch.tooltip) for ch in g.chips
             )
             items.append(MenuItem(g.title, None, children=children))
     bulk = build_bulk(snapshot)

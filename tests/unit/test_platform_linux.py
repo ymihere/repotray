@@ -45,16 +45,92 @@ def test_split_template_substitutes_after_splitting():
     assert split_template("sh -c 'echo {path}'", path) == ["sh", "-c", f"echo {path}"]
 
 
-def test_terminal_detection_prefers_x_terminal_emulator(tmp_path):
+def no_gsettings(schema, key):
+    return None
+
+
+def plain_env(tmp_path, desktop=""):
+    return {
+        "XDG_CURRENT_DESKTOP": desktop,
+        "XDG_CONFIG_HOME": str(tmp_path / "cfg"),
+        "XDG_CONFIG_DIRS": str(tmp_path / "etc"),
+        "XDG_DATA_DIRS": str(tmp_path / "share"),
+    }
+
+
+def test_terminal_falls_back_to_x_terminal_emulator(tmp_path):
     target = tmp_path / "terminator"
     target.write_text("")
     link = tmp_path / "x-terminal-emulator"
     link.symlink_to(target)
-    p = LinuxPlatform(which=which_from({"gnome-terminal"}, str(link)))
+    env = plain_env(tmp_path)
+    p = LinuxPlatform(
+        which=which_from({"gnome-terminal"}, str(link)), gsettings=no_gsettings, env=env
+    )
     assert p.terminal_template("") == "terminator --working-directory={path}"
-    p2 = LinuxPlatform(which=which_from({"konsole", "xterm"}))
+    p2 = LinuxPlatform(which=which_from({"konsole", "xterm"}), gsettings=no_gsettings, env=env)
     assert p2.terminal_template("") == "konsole --workdir {path}"
     assert p2.terminal_template("foot -D {path}") == "foot -D {path}"
+
+
+def test_desktop_preferred_terminal_wins_over_x_terminal_emulator(tmp_path):
+    """Mint: Preferred Applications says gnome-terminal, the Debian alternative terminator."""
+    target = tmp_path / "terminator"
+    target.write_text("")
+    link = tmp_path / "x-terminal-emulator"
+    link.symlink_to(target)
+    which = which_from({"gnome-terminal", "terminator", "mate-terminal"}, str(link))
+    settings = {
+        ("org.cinnamon.desktop.default-applications.terminal", "exec"): "gnome-terminal",
+        ("org.mate.applications-terminal", "exec"): "mate-terminal",
+        ("org.gnome.desktop.default-applications.terminal", "exec"): "x-terminal-emulator",
+    }
+
+    def gs(schema, key):
+        return settings.get((schema, key))
+
+    def tmpl(desktop):
+        env = plain_env(tmp_path, desktop)
+        return LinuxPlatform(which=which, gsettings=gs, env=env).terminal_template("")
+
+    assert tmpl("X-Cinnamon") == "gnome-terminal --working-directory={path}"
+    assert tmpl("MATE") == "mate-terminal --working-directory={path}"
+    # GNOME's setting names x-terminal-emulator: follow the alternative.
+    assert tmpl("ubuntu:GNOME") == "terminator --working-directory={path}"
+    assert tmpl("X-Cinnamon") != tmpl("")  # without a desktop: x-terminal-emulator
+
+
+def test_xdg_terminals_list(tmp_path):
+    env = plain_env(tmp_path, "KDE")
+    (tmp_path / "cfg").mkdir()
+    (tmp_path / "cfg/xdg-terminals.list").write_text("# comment\nmy.Kitty.desktop\n")
+    apps = tmp_path / "share/applications"
+    apps.mkdir(parents=True)
+    (apps / "my.Kitty.desktop").write_text("[Desktop Entry]\nExec=kitty --single-instance\n")
+    p = LinuxPlatform(which=which_from({"kitty", "xterm"}), gsettings=no_gsettings, env=env)
+    p.data_home = lambda: tmp_path / "nowhere"
+    assert p.preferred_terminal() == "kitty"
+    assert p.terminal_template("") == "kitty --directory {path}"
+
+
+def test_unknown_preferred_terminal_runs_in_cwd(tmp_path):
+    env = plain_env(tmp_path, "X-Cinnamon")
+
+    def gs(schema, key):
+        return "cool-retro-term"
+
+    p = LinuxPlatform(which=which_from({"cool-retro-term"}), gsettings=gs, env=env)
+    assert p.terminal_template("") == "cool-retro-term"
+
+
+def test_open_file_with_editor_template(tmp_path):
+    sp = Spawned()
+    p = LinuxPlatform(run_spawn=sp)
+    f = tmp_path / "log file.txt"
+    p.open_file(f)
+    p.open_file(f, "xed --new-window {path}")
+    assert sp.calls[0][0] == ["xdg-open", str(f)]
+    assert sp.calls[1][0] == ["xed", "--new-window", str(f)]
 
 
 def test_open_terminal_and_folder(tmp_path):

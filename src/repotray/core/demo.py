@@ -5,6 +5,8 @@
 
 from __future__ import annotations
 
+import datetime
+import hashlib
 import threading
 import time
 from collections import deque
@@ -14,6 +16,7 @@ from pathlib import Path
 
 from repotray.core.actions import block_reason, plan_bulk, summarize_bulk
 from repotray.core.config import Config, ConfigWatcher
+from repotray.core.gitstatus import Commit, CommitLog
 from repotray.core.types import (
     ActionKind,
     ActionResult,
@@ -39,6 +42,45 @@ PULL_FAILURE = (
     'hint: Disable this message with "git config advice.diverging false"\n'
     "fatal: Not possible to fast-forward, aborting.\n"
 )
+
+
+DEMO_COMMITS = [
+    (
+        "Ada Example",
+        "Fix race in session refresh",
+        "The refresh timer could fire after logout and recreate the\n"
+        "session. Cancel it in logout() and add a regression test.",
+    ),
+    ("Grace Example", "Bump dependencies", ""),
+    (
+        "Linus Example",
+        "Add dark mode to the settings page",
+        "Follows the system preference; a toggle overrides it.\n\nCloses #142.",
+    ),
+    ("Ada Example", "Update screenshots in the README", ""),
+    (
+        "Grace Example",
+        "Speed up the CI cache",
+        "Cache the package manager store instead of node_modules.\n"
+        "Cuts cold builds from 6 to 2 minutes.",
+    ),
+]
+
+
+def demo_incoming(st: RepoState, now: float) -> CommitLog:
+    """Fabricated incoming commits for a demo repo (as many as it is behind)."""
+    commits, text = [], []
+    for i in range(st.behind):
+        author, subject, body = DEMO_COMMITS[i % len(DEMO_COMMITS)]
+        sha = hashlib.sha1(f"{st.name}/{i}".encode()).hexdigest()
+        when = datetime.datetime.fromtimestamp(now - 3600 * (i + 1) * 5, datetime.UTC)
+        commits.append(Commit(sha, author, when.isoformat(), subject, body))
+        msg = "\n".join(
+            "    " + line for line in (subject + ("\n\n" + body if body else "")).split("\n")
+        )
+        text.append(f"commit {sha}\nAuthor: {author} <{author.split()[0].lower()}@example.com>\n"
+                    f"Date:   {when:%a %b %d %H:%M:%S %Y %z}\n\n{msg}\n")  # fmt: skip
+    return CommitLog(tuple(commits), st.behind, "\n".join(text))
 
 
 def _state(name: str, **kw) -> RepoState:
@@ -253,6 +295,13 @@ class DemoScheduler:
             duration=now - started,
             name=st.name,
         )
+
+    def incoming(self, path: Path) -> CommitLog:
+        with self._lock:
+            st = self.states.get(path)
+        if st is None:
+            return CommitLog(error="unknown repository")
+        return demo_incoming(st, self.clock())
 
     def sync_all(self) -> None:
         self._bulk(ActionKind.SYNC)

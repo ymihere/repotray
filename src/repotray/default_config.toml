@@ -31,9 +31,11 @@ notifications = false
 sync_strategy = "rebase"
 action_timeout = 120
 
-# Commands with {path} substituted. Empty = detect automatically.
+# Commands with {path} substituted. Empty = the desktop's defaults: its preferred terminal,
+# file manager and text editor (on Linux Mint: System Settings → Preferred Applications).
 terminal = ""
 file_manager = ""
+editor = ""
 
 # auto | xapp | appindicator | gtkstatusicon | pystray | a plugin name
 backend = "auto"
@@ -52,7 +54,7 @@ marker = "arrow"
 # Top/bottom corner markers and a tint of the whole glyph, each shown when any of its triggers
 # applies. Colours: foreground | warning | error | success (theme colours), or "#rrggbb".
 top_dot = ["push"]
-top_dot_color = "success"
+top_dot_color = "warning"
 bottom_dot = ["pull"]
 bottom_dot_color = "warning"
 tint = []

@@ -48,9 +48,10 @@ as the last `git fetch`. repotray fetches itself (see §4).
     update icon (`marker = "dot"`, decided 2026-10-07). The top-right marker, the
     bottom-right marker and the tint each have their own trigger set drawn from `push`
     (≥ 1 repo pushable), `pull` (≥ 1 repo behind) and `dirty` (≥ 1 repo with
-    uncommitted changes), and their own theme colour. Default: green ▲ top-right =
+    uncommitted changes), and their own theme colour. Default: orange ▲ top-right =
     something to push, orange ▼ bottom-right = something to pull (the spot and colour
-    of "updates available"), both at once when both hold, no tint. Any of the three can
+    of "updates available"; both orange since 2026-10-07 — the green was hard to see on
+    the dark panel), both at once when both hold, no tint. Any of the three can
     be switched off; with all off the icon never changes and only the label signals
     work.
   - `error` — the last fetch pass failed for every repo (probably offline) or git is
@@ -173,7 +174,13 @@ When nothing is pushable or pullable the columns are replaced by a single centre
 
 **Row anatomy.** Name = directory basename, `parent/name` when two repos collide; the
 tooltip shows the full path, branch and upstream. Clicking the name opens the repo
-context menu: *Open terminal here*, *Open folder*, *Copy path*, *Fetch now*. Markers:
+context menu: *Show incoming commits (N)…* (only when the repo is behind), *Open terminal
+here*, *Open folder*, *Copy path*, *Fetch now*. *Show incoming commits* lists the commits a
+pull would bring (`git log HEAD..@{upstream}`, read-only, as of the last fetch): subject,
+short hash, author, age and full message, up to 200; *Open in editor* writes the complete
+log to a text file and opens it in the `editor` (default: the desktop's text editor, xed on
+Mint). *Open terminal here* opens the desktop's default terminal (Preferred Applications on
+Cinnamon), unless `terminal` is configured (decided 2026-10-07). Markers:
 `↑N` / `↓N` commit counts, `✎` uncommitted changes (tooltip reminds that push sends
 commits only), `⚠` the last fetch or action failed (tooltip: the error). Buttons are
 flat 16 px symbolic theme icons (§6) with tooltips such as "Push 3 commits to
@@ -311,8 +318,9 @@ sync_strategy = "rebase"         # or "merge": how Sync reconciles a diverged br
 action_timeout = 120             # seconds, for push / pull / sync
 
 # {path} is substituted. Empty = auto-detect per platform (PLAN §4.10).
-terminal = ""                      # e.g. "terminator --working-directory={path}"
+terminal = ""                      # e.g. "terminator --working-directory={path}"; "" = desktop default
 file_manager = ""                  # Linux xdg-open, macOS open, Windows explorer
+editor = ""                        # config file, incoming commits; "" = desktop's text editor
 
 backend = "auto"                   # or xapp | appindicator | gtkstatusicon | pystray | a plugin
 panel_theme = "auto"               # auto | dark | light | system
@@ -322,7 +330,7 @@ log_level = "info"
 label = ["push", "pull"]          # parts next to the icon: push ↑N, pull ↓N, dirty ✎N; [] = no label
 marker = "arrow"                  # corner markers: "arrow" (▲ top-right, ▼ bottom-right) or "dot"
 top_dot = ["push"]                # top-right marker, shown when any of push / pull / dirty applies; [] = never
-top_dot_color = "success"         # foreground | warning | error | success | "#rrggbb"
+top_dot_color = "warning"         # foreground | warning | error | success | "#rrggbb"
 bottom_dot = ["pull"]             # bottom-right marker: the spot Mint's update icon uses
 bottom_dot_color = "warning"      # "warning" is the colour of "updates available"
 tint = []                         # recolour the whole glyph when any of these apply; [] = never
@@ -334,7 +342,7 @@ fetch = false
 name = "monorepo"                  # optional display name
 ```
 
-Three `[indicator]` examples. *Default:* green ▲ top-right when you have commits to
+Three `[indicator]` examples. *Default:* orange ▲ top-right when you have commits to
 push, orange ▼ bottom-right when someone else pushed, both when both. *Like
 mintupdate:* `marker = "dot"`, `top_dot = []`, `bottom_dot = ["push", "pull", "dirty"]` → one orange dot
 bottom-right whenever anything needs doing, indistinguishable in style from the

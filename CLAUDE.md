@@ -28,8 +28,8 @@ published (the maintainer does that, see RELEASING.md). Installed for the mainta
 - Sync = `git pull --rebase` then `git push`; `merge` is the only alternative. Never auto-stash, abort on
   conflicts, so a failed action leaves the repo as it was.
 - Icon signalling is configurable (`[indicator]`): label parts, a top-right marker, a bottom-right marker
-  and a tint, each with its own trigger set and theme colour. Defaults: green ▲ top-right = push, orange
-  ▼ bottom-right = pull (Mint's "updates available" spot and colour). Markers are arrows by default
+  and a tint, each with its own trigger set and theme colour. Defaults: orange ▲ top-right = push, orange
+  ▼ bottom-right = pull (both orange: the green was hard to see) (Mint's "updates available" spot and colour). Markers are arrows by default
   (`marker = "arrow"`, 7×6 triangles, 1 px knockout); `marker = "dot"` copies
   mintupdate-updates-available-symbolic.svg: r=3 at (13,13)/(13,3), glyph knocked out r=4. Knockouts are
   baked into the path, no masks.

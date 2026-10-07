@@ -21,7 +21,6 @@ from repotray.core.model import (
     Cell,
     PanelModel,
     Row,
-    repo_menu,
 )
 from repotray.core.types import ActionKind
 from repotray.ui.placement import Anchor, Rect, place
@@ -197,12 +196,12 @@ class PanelView(Gtk.Box):
         b.connect("clicked", cb)
         return b
 
-    def _popup_repo_menu(self, widget: Gtk.Widget, path) -> None:
-        menu = build_menu(repo_menu(path), self.dispatch, self.menu_state)
+    def _popup_repo_menu(self, widget: Gtk.Widget, items) -> None:
+        menu = build_menu(items, self.dispatch, self.menu_state)
         menu.attach_to_widget(widget, None)
         menu.popup_at_widget(widget, Gdk.Gravity.SOUTH_WEST, Gdk.Gravity.NORTH_WEST, None)
 
-    def _name_button(self, name: str, tooltip: str, path, xalign: float) -> Gtk.Button:
+    def _name_button(self, name: str, tooltip: str, menu, xalign: float) -> Gtk.Button:
         b = Gtk.Button()
         b.set_relief(Gtk.ReliefStyle.NONE)
         lbl = Gtk.Label(label=name, xalign=xalign)
@@ -211,7 +210,7 @@ class PanelView(Gtk.Box):
         b.add(lbl)
         b.set_tooltip_text(tooltip)
         b.get_style_context().add_class("rt-name")
-        b.connect("clicked", lambda w: self._popup_repo_menu(w, path))
+        b.connect("clicked", lambda w: self._popup_repo_menu(w, menu))
         return b
 
     def _action_button(self, btn: Button, path) -> Gtk.Widget:
@@ -342,7 +341,7 @@ class PanelView(Gtk.Box):
         # columns: name | markers | push | sync | pull | markers | name
         if row.left:
             c = row.left
-            g.attach(self._name_button(c.name, c.tooltip, c.path, 0.0), 0, i, 1, 1)
+            g.attach(self._name_button(c.name, c.tooltip, c.menu, 0.0), 0, i, 1, 1)
             g.attach(self._markers(c, right=False), 1, i, 1, 1)
             g.attach(self._action_button(c.button, c.path), 2, i, 1, 1)
         if row.sync:
@@ -355,7 +354,7 @@ class PanelView(Gtk.Box):
             c = row.right
             g.attach(self._action_button(c.button, c.path), 4, i, 1, 1)
             g.attach(self._markers(c, right=True), 5, i, 1, 1)
-            name = self._name_button(c.name, c.tooltip, c.path, 1.0)
+            name = self._name_button(c.name, c.tooltip, c.menu, 1.0)
             g.attach(name, 6, i, 1, 1)
         # The two name columns share the free width, so the buttons meet in the middle.
         for col in (0, 6):
@@ -379,7 +378,7 @@ class PanelView(Gtk.Box):
                 b.set_relief(Gtk.ReliefStyle.NONE)
                 b.get_style_context().add_class("rt-chip")
                 b.set_tooltip_text(chip.tooltip)
-                b.connect("clicked", lambda w, p=chip.path: self._popup_repo_menu(w, p))
+                b.connect("clicked", lambda w, m=chip.menu: self._popup_repo_menu(w, m))
                 flow.add(b)
             if g.collapsed:
                 exp = Gtk.Expander(label=g.title)
@@ -538,11 +537,18 @@ class Panel(Gtk.Window):
             GLib.idle_add(lambda: self._place() or False)
 
     def show_details(self, result) -> None:
-        self.dialog_open = True
-        dlg = DetailsDialog(self, result)
+        self.track_dialog(lambda parent: DetailsDialog(parent, result))
+
+    def track_dialog(self, make) -> Gtk.Window:
+        """Open a dialog over the panel; the panel stays open while the dialog is shown."""
+        parent = self if self.get_visible() else None
+        self.dialog_open = parent is not None
+        dlg = make(parent)
 
         def closed(*_):
             self.dialog_open = False
-            GLib.timeout_add(100, self._refocus)
+            if parent is not None:
+                GLib.timeout_add(100, self._refocus)
 
         dlg.connect("destroy", closed)
+        return dlg

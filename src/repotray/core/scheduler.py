@@ -26,7 +26,13 @@ from repotray.core.actions import (
 )
 from repotray.core.config import Config, ConfigWatcher
 from repotray.core.gitrun import Runner, git_available
-from repotray.core.gitstatus import apply_fetch_result, check_status, fetch_repo
+from repotray.core.gitstatus import (
+    CommitLog,
+    apply_fetch_result,
+    check_status,
+    fetch_repo,
+    incoming_commits,
+)
 from repotray.core.scanner import scan
 from repotray.core.types import (
     ActionKind,
@@ -149,6 +155,10 @@ class Scheduler:
 
     def run_action(self, kind: ActionKind, path: Path) -> None:
         self._post(lambda: self._submit_action(kind, path))
+
+    def incoming(self, path: Path) -> CommitLog:
+        """Commits a pull would bring (read-only). Blocking: call it off the UI thread."""
+        return incoming_commits(self.runner, path)
 
     def sync_all(self) -> None:
         self._post(lambda: self._start_bulk(ActionKind.SYNC))

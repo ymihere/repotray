@@ -56,8 +56,9 @@ that disappear are dropped silently at the next rescan.
 | Key | Type | Default | Notes |
 |---|---|---|---|
 | `sync_strategy` | `"rebase"` \| `"merge"` | `"rebase"` | How Sync reconciles a diverged branch: `git pull --rebase` or `git pull --no-rebase`, then `git push`. |
-| `terminal` | command template | `""` | *Open terminal here*. `{path}` is substituted into each argument after splitting; no shell is involved. Empty = auto-detect (`x-terminal-emulator` target, gnome-terminal, terminator, xfce4-terminal, mate-terminal, konsole, tilix, kitty, alacritty, wezterm, foot, xterm; macOS Terminal; Windows Terminal or cmd). Example: `"kitty --directory {path}"`. |
+| `terminal` | command template | `""` | *Open terminal here*. `{path}` is substituted into each argument after splitting; no shell is involved. Empty = your desktop's default terminal: the one set in the desktop's preferred applications (Cinnamon, MATE, GNOME), else the XDG `xdg-terminals.list`, else `x-terminal-emulator`, else the first installed of gnome-terminal, terminator, xfce4-terminal, mate-terminal, konsole, tilix, kitty, alacritty, wezterm, foot, xterm; macOS Terminal; Windows Terminal or cmd. Example: `"kitty --directory {path}"`. |
 | `file_manager` | command template | `""` | *Open folder*. Empty = `xdg-open` / `open` / `explorer`. Example: `"nemo {path}"`. |
+| `editor` | command template | `""` | Text editor for *Open config file* and for the full list of incoming commits (*Show incoming commits… → Open in editor*). Empty = the desktop's default application for text files (`xdg-open`; on Linux Mint that is xed), macOS TextEdit, Windows' default. Example: `"code --new-window {path}"`. |
 
 ## Appearance and backend
 
@@ -80,7 +81,7 @@ arrows: a ▲ top-right for something to push, a ▼ bottom-right for something 
 | `label` | list ⊆ {push, pull, dirty} | `["push", "pull"]` | Text next to the icon: `↑N` repos to push, `↓N` to pull, `✎N` dirty; in this order; zero parts omitted; `[]` = no label. |
 | `marker` | `arrow` \| `dot` | `"arrow"` | Shape of the corner markers: ▲ top-right / ▼ bottom-right, or round dots exactly like Mint's update icon. |
 | `top_dot` | list ⊆ {push, pull, dirty} | `["push"]` | The top-right marker (▲ or dot). `[]` = never. (The key keeps its name for both shapes.) |
-| `top_dot_color` | colour | `"success"` | `foreground`, `warning`, `error`, `success` or `"#rrggbb"`. |
+| `top_dot_color` | colour | `"warning"` | `foreground`, `warning`, `error`, `success` or `"#rrggbb"`. |
 | `bottom_dot` | list ⊆ {push, pull, dirty} | `["pull"]` | The bottom-right marker (▼ or dot) — where Mint's update icon puts its dot. |
 | `bottom_dot_color` | colour | `"warning"` | `warning` is the colour of "updates available". |
 | `tint` | list ⊆ {push, pull, dirty} | `[]` | Recolour the whole glyph. |
@@ -98,8 +99,8 @@ failed, probably offline, or git is missing) and **paused** (two bars: fetching 
 
 ### Recipes
 
-*Default* — a green ▲ when you have commits to push, an orange ▼ when someone else pushed, both
-when both:
+*Default* — an orange ▲ when you have commits to push, an orange ▼ when someone else pushed, both
+when both (set `top_dot_color = "success"` for a green ▲):
 
 ```toml
 [indicator]

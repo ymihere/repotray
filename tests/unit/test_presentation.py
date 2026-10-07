@@ -52,7 +52,8 @@ DEMO = demo_snapshot(NOW)
 def test_demo_label_and_icon():
     cfg = Config()
     assert label_text(DEMO, cfg) == "↑3 ↓3"
-    assert icon_spec(DEMO, cfg) == IconSpec("attention", "success", "warning", None)
+    # Both markers in the pull marker's orange (the green was hard to see).
+    assert icon_spec(DEMO, cfg) == IconSpec("attention", "warning", "warning", None)
     assert icon_spec(DEMO, cfg).marker == "arrow"
     dots = Config(indicator=IndicatorConfig(marker="dot"))
     assert icon_spec(DEMO, dots).marker == "dot"
@@ -79,7 +80,7 @@ def test_count_no_upstream_as_push():
     assert counts(s, Config()).push == 0
     cfg = Config(count_no_upstream_as_push=True)
     assert counts(s, cfg).push == 1
-    assert icon_spec(s, cfg).top == "success"
+    assert icon_spec(s, cfg).top == "warning"
 
 
 def test_untracked_counting():
@@ -268,6 +269,24 @@ def test_ago():
 
 def labels(items):
     return [i.label for i in items if not i.separator]
+
+
+def test_repo_menu_offers_incoming_commits_when_behind():
+    m = panel_model(DEMO, Config(), NOW)
+    by = {}
+    for r in m.rows:
+        for c in (r.left, r.right):
+            if c:
+                by[(c.name, c is r.left)] = c.menu
+    website = [i.label for i in by[("website", False)] if not i.separator]
+    assert website[0] == "Show incoming commits (4)…"
+    assert by[("website", False)][0].action == "show_incoming"
+    assert by[("design-system", True)][0].label == "Show incoming commits (2)…"
+    api = [i.label for i in by[("api-gateway", True)]]
+    assert not any("incoming" in label for label in api)
+    assert api[0] == "Open terminal here"
+    chips = {c.name: c.menu for g in m.groups for c in g.chips}
+    assert chips["docs"][0].label == "Open terminal here"
 
 
 def test_control_menu():

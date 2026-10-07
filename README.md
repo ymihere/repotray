@@ -7,7 +7,7 @@ have **local work** (uncommitted changes or commits to push) and how many have *
 other tray icon, with a platform-independent core that other desktops and operating systems plug
 into.
 
-![Tray icon with a green ▲ (something to push), an orange ▼ (something to pull) and the label ↑3 ↓3](docs/images/tray.png)
+![Tray icon with an orange ▲ (something to push), an orange ▼ (something to pull) and the label ↑3 ↓3](docs/images/tray.png)
 
 ![The panel: pushable repos on the left, pullable on the right, buttons meeting in the middle](docs/images/panel-dark.png)
 
@@ -16,7 +16,7 @@ into.
 ## Features
 
 - **Counts at a glance.** The label next to the icon shows `↑3 ↓1` (repos to push / to pull).
-  A green ▲ in the top-right corner means something to push, an orange ▼ in the bottom-right
+  An orange ▲ in the top-right corner means something to push, an orange ▼ in the bottom-right
   corner (the spot and colour of Mint's "updates available") means something to pull. Prefer
   Mint-style dots? Set `marker = "dot"`.
 - **Native look on Cinnamon.** The icon is a monochrome *symbolic* SVG that the panel recolours
@@ -69,10 +69,13 @@ In the panel, each repository row has a button: **Push** (`git push` to its upst
 (`git pull --ff-only`) or, for a branch that has diverged, **Sync** (`git pull --rebase`, then
 `git push`; `sync_strategy = "merge"` merges instead). Sync refuses to run while the repository
 has uncommitted tracked changes, and if the rebase hits conflicts it is aborted and the repository
-is left as it was. **Push all** pushes every repository that is only ahead, **Pull all** pulls
+is left as it was. Before pulling, *Show incoming commits…* in a repository's menu lists the commit
+messages a pull would bring, with a button to open the full log in your text editor.
+**Push all** pushes every repository that is only ahead, **Pull all** pulls
 every one that is only behind, and **Sync all** does both and also syncs the diverged ones. Rows
 are sorted by name; `panel_sort = "state"` puts syncable, then pushable, then pullable first. Click a repository name for
-*Open terminal here*, *Open folder*, *Copy path* and *Fetch now*.
+*Open terminal here* (your desktop's default terminal), *Open folder*, *Copy path*, *Fetch now*
+and, when there is something to pull, *Show incoming commits…*.
 
 repotray fetches every 10 minutes (and after resume from suspend), checks local status every
 minute, and backs off when the network is down.

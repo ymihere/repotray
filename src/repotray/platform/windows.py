@@ -97,8 +97,11 @@ class WindowsPlatform(BasePlatform):
         argv = split_template(template, path, posix=False) if template else ["explorer", str(path)]
         self.spawn(argv, cwd=path)
 
-    def open_file(self, path: Path) -> None:
-        os.startfile(str(path))  # type: ignore[attr-defined]  # noqa: S606
+    def open_file(self, path: Path, template: str = "") -> None:
+        if template:
+            self.spawn(split_template(template, path, posix=False))
+        else:
+            os.startfile(str(path))  # type: ignore[attr-defined]  # noqa: S606
 
     def notify(self, title: str, body: str) -> bool:
         return False  # pystray's own notify is used; there is no stdlib fallback

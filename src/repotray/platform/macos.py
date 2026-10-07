@@ -67,8 +67,8 @@ class MacPlatform(BasePlatform):
         argv = split_template(template, path) if template else ["open", str(path)]
         self.spawn(argv, cwd=path)
 
-    def open_file(self, path: Path) -> None:
-        self.spawn(["open", "-t", str(path)])
+    def open_file(self, path: Path, template: str = "") -> None:
+        self.spawn(split_template(template, path) if template else ["open", "-t", str(path)])
 
     def notify_argv(self, title: str, body: str) -> list[str]:
         script = (

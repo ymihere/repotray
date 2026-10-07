@@ -192,3 +192,73 @@ def apply_fetch_result(state: RepoState, res: GitResult, now: float) -> RepoStat
         return replace(state, fetch_error=None, fetched_at=now)
     msg = first_line(res.err, res.out) or f"git fetch exited with {res.returncode}"
     return replace(state, fetch_error=msg)
+
+
+# --- incoming commits ----------------------------------------------------------------------------
+
+LOG_LIMIT = 200  # commits shown in the panel's dialog
+TEXT_LIMIT = 5000  # commits written to the "open in editor" text
+
+
+@dataclass(frozen=True, slots=True)
+class Commit:
+    sha: str
+    author: str
+    date: str  # ISO 8601
+    subject: str
+    body: str
+
+
+@dataclass(frozen=True, slots=True)
+class CommitLog:
+    """Commits on the upstream that the current branch does not have yet (what a pull brings)."""
+
+    commits: tuple[Commit, ...] = ()
+    total: int = 0
+    text: str = ""  # full `git log` output for an editor
+    error: str | None = None
+
+
+_FIELD, _RECORD = "\x1f", "\x1e"
+INCOMING = "HEAD..@{upstream}"
+
+
+def parse_log(out: str) -> tuple[Commit, ...]:
+    commits = []
+    for rec in out.split(_RECORD):
+        rec = rec.strip("\n")
+        if not rec:
+            continue
+        parts = rec.split(_FIELD)
+        if len(parts) < 5:
+            continue
+        sha, author, date, subject, body = parts[:5]
+        commits.append(Commit(sha, author, date, subject, body.strip()))
+    return tuple(commits)
+
+
+def incoming_commits(runner: Runner, path: Path, limit: int = LOG_LIMIT) -> CommitLog:
+    """Read-only: the commits a pull would bring, newest first, from the last fetch."""
+    count = runner(["rev-list", "--count", INCOMING], path, QUERY_TIMEOUT, kind=CallKind.QUERY)
+    if not count.ok:
+        return CommitLog(error=first_line(count.err) or "no upstream")
+    fmt = f"--format=%H{_FIELD}%an{_FIELD}%aI{_FIELD}%s{_FIELD}%b{_RECORD}"
+    log = runner(
+        ["log", "--no-color", fmt, f"--max-count={limit}", INCOMING],
+        path,
+        QUERY_TIMEOUT,
+        kind=CallKind.QUERY,
+    )
+    if not log.ok:
+        return CommitLog(error=first_line(log.err) or "git log failed")
+    text = runner(
+        ["log", "--no-color", "--decorate=no", f"--max-count={TEXT_LIMIT}", INCOMING],
+        path,
+        QUERY_TIMEOUT,
+        kind=CallKind.QUERY,
+    )
+    return CommitLog(
+        commits=parse_log(log.out),
+        total=int(count.out.strip() or 0),
+        text=text.out if text.ok else "",
+    )

@@ -132,6 +132,19 @@ class GtkBackendBase:
                 log.warning("notification failed: %s", exc)
         self.platform.notify(title, body)
 
+    def show_commits(self, title: str, subtitle: str, log, on_open_editor) -> None:
+        from repotray.ui.gtk3.commits import CommitsDialog
+
+        def make(parent):
+            dlg = CommitsDialog(parent, title, subtitle, log, on_open_editor)
+            dlg.present()
+            return dlg
+
+        if self.panel is not None:
+            self.panel.track_dialog(make)
+        else:
+            make(None)
+
     def copy_to_clipboard(self, text: str) -> None:
         cb = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
         cb.set_text(text, -1)

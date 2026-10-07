@@ -454,3 +454,33 @@ def test_cli_misc(tmp_path):
     assert "[indicator]" in cli("config", "default", config=cfg, check_code=0).stdout
     cli("quit", config=cfg, check_code=1)
     assert cli("--version", config=cfg, check_code=0).stdout.strip() == "0.1.0"
+
+
+def test_incoming_commits(pair):
+    from repotray.core.gitstatus import incoming_commits
+
+    _, mine, theirs = pair
+    assert incoming_commits(GitRunner(), mine).total == 0
+    git(
+        theirs,
+        "commit",
+        "-q",
+        "--allow-empty",
+        "-m",
+        "First subject",
+        "-m",
+        "Body line one\n\nmore",
+    )
+    commit(theirs, "x.txt", msg="Second subject")
+    git(theirs, "push", "-q")
+    git(mine, "fetch", "-q")
+    log = incoming_commits(GitRunner(), mine)
+    assert log.error is None and log.total == 2
+    assert [c.subject for c in log.commits] == ["Second subject", "First subject"]
+    assert log.commits[1].body == "Body line one\n\nmore"
+    assert log.commits[0].author == "Test User" and len(log.commits[0].sha) == 40
+    assert "Second subject" in log.text and "Body line one" in log.text
+    assert incoming_commits(GitRunner(), mine, limit=1).total == 2
+    assert len(incoming_commits(GitRunner(), mine, limit=1).commits) == 1
+    git(mine, "checkout", "-q", "-b", "local-only")
+    assert incoming_commits(GitRunner(), mine).error  # no upstream

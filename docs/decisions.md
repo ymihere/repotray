@@ -111,6 +111,21 @@ Format: date — question → choice (reason).
 - The maintainer confirmed real mouse clicks work (2026-10-07), and sees the counts next to the
   icon with the default XApp backend. Only the AppIndicator route on Cinnamon (via
   `xapp-sn-watcher`) drops the label — re-checked the same day.
+- Both markers default to `warning` (orange): the maintainer found the green ▲ hard to see.
+  `top_dot_color = "success"` brings the green back.
+- *Open terminal here* asks the desktop first: on Mint the Debian `x-terminal-emulator`
+  alternative pointed to terminator while Cinnamon's Preferred Applications (and
+  `xdg-terminals.list`) said gnome-terminal, and repotray had picked terminator. Order now: config
+  `terminal` > desktop setting by `XDG_CURRENT_DESKTOP` (Cinnamon, MATE, GNOME-family gsettings) >
+  XDG `xdg-terminals.list` > `x-terminal-emulator` > known terminals. A preferred terminal repotray
+  does not know is started with the repository as its working directory.
+- *Show incoming commits (N)…* is the first repo-menu item when the repo is behind (cells and
+  chips now carry their own menu). It runs `git log HEAD..@{upstream}` off the UI thread (read
+  only; as of the last fetch, no fetch first) and shows up to 200 commits in a dialog that keeps
+  the panel open. *Open in editor* writes the whole log (up to 5000 commits, `git log` medium
+  format) to `~/.cache/repotray/incoming-<name>.txt` and opens it with `editor`, else `xdg-open`
+  (xed on Mint). Backends without dialogs open the editor directly. Only incoming commits were
+  asked for; outgoing ones are not listed.
 
 ## Blocked / unverified
 - 2026-10-07 — **Live tray screenshots (M2, M3) while the session is locked.** The maintainer's
@@ -127,3 +142,6 @@ Format: date — question → choice (reason).
 - `shellcheck` is not installed on the dev machine; the scripts were checked with `bash -n`/`sh -n`
   and an install → reinstall → uninstall round trip into a temporary `HOME`.
 - The GitHub workflows have never run (nothing is pushed); YAML was validated locally.
+- 2026-10-07 — `docs/images/tray.png` still shows the earlier green ▲: the session was locked when
+  the orange default landed, and the tray image is a live capture. Refresh it with
+  `repotray tray --demo` + `scripts/dev/screenshot.py tray` when unlocked.

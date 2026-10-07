@@ -34,7 +34,7 @@ DEFAULT_EXCLUDE_DIRS = (
 class IndicatorConfig:
     label: tuple[str, ...] = ("push", "pull")
     top_dot: tuple[str, ...] = ("push",)
-    top_dot_color: str = "success"
+    top_dot_color: str = "warning"
     bottom_dot: tuple[str, ...] = ("pull",)
     bottom_dot_color: str = "warning"
     tint: tuple[str, ...] = ()
@@ -70,6 +70,7 @@ class Config:
     sync_strategy: str = "rebase"
     terminal: str = ""
     file_manager: str = ""
+    editor: str = ""
     backend: str = "auto"
     panel_theme: str = "auto"
     panel_sort: str = "name"
@@ -125,6 +126,7 @@ _STR_CHOICES: dict[str, tuple[str, ...] | None] = {
     "sync_strategy": ("rebase", "merge"),
     "terminal": None,
     "file_manager": None,
+    "editor": None,
     "backend": None,
     "panel_theme": ("auto", "dark", "light", "system"),
     "panel_sort": ("name", "state"),
@@ -190,7 +192,7 @@ def from_dict(data: dict[str, Any]) -> tuple[Config, list[str]]:
             rep, w = _repo_overrides(v)
             values[key] = rep
             warnings += w
-    for key in ("terminal", "file_manager"):
+    for key in ("terminal", "file_manager", "editor"):
         tmpl = values.get(key, "")
         if tmpl and "{path}" not in tmpl:
             warnings.append(f"'{key}' has no {{path}} placeholder; the path is passed as cwd only")

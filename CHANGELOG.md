@@ -13,10 +13,17 @@ All notable changes to this project are documented here. The format follows
 - The panel shows one row per repository (push side left, pull side right), sorted by name;
   `panel_sort = "state"` lists syncable, then pushable, then pullable repositories first.
 - The gear menu moved to the panel header.
+- The ▲ (push) marker is orange like the ▼ (pull) marker by default; the green was hard to see.
+- *Open terminal here* opens the desktop's default terminal (Preferred Applications on
+  Cinnamon/MATE/GNOME, then `xdg-terminals.list`) instead of the `x-terminal-emulator`
+  alternative.
 
 ### Added
 - *Push all* and *Pull all* buttons next to *Sync all*, at the top of the panel, in the fallback
   menu, and as `repotray push --all` / `repotray pull --all`.
+- *Show incoming commits…* in a repository's menu: the commit messages a pull would bring, with
+  *Open in editor* for the full log. New `editor` setting (default: the desktop's text editor),
+  also used by *Open config file*.
 
 ## [0.1.0] — unreleased
 
