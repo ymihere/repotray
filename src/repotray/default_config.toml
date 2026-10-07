@@ -39,14 +39,18 @@ file_manager = ""
 backend = "auto"
 # auto | dark | light | system
 panel_theme = "auto"
+# Panel rows: "name" (alphabetical) or "state" (syncable, then pushable, then pullable).
+panel_sort = "name"
 # debug | info | warning
 log_level = "info"
 
 [indicator]
 # Text next to the icon: push ↑N, pull ↓N, dirty ✎N. [] = no label.
 label = ["push", "pull"]
-# Corner dots and a tint of the whole glyph, each shown when any of its triggers applies.
-# Colours: foreground | warning | error | success (theme colours), or "#rrggbb".
+# Corner markers: "arrow" (▲ top-right, ▼ bottom-right) or "dot" (like Mint's update icon).
+marker = "arrow"
+# Top/bottom corner markers and a tint of the whole glyph, each shown when any of its triggers
+# applies. Colours: foreground | warning | error | success (theme colours), or "#rrggbb".
 top_dot = ["push"]
 top_dot_color = "success"
 bottom_dot = ["pull"]

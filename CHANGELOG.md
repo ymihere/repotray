@@ -6,6 +6,18 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- The tray icon's corner markers are now arrows: a ▲ top-right when there is something to push,
+  a ▼ bottom-right when there is something to pull. `[indicator] marker = "dot"` restores the
+  Mint-style dots.
+- The panel shows one row per repository (push side left, pull side right), sorted by name;
+  `panel_sort = "state"` lists syncable, then pushable, then pullable repositories first.
+- The gear menu moved to the panel header.
+
+### Added
+- *Push all* and *Pull all* buttons next to *Sync all*, at the top of the panel, in the fallback
+  menu, and as `repotray push --all` / `repotray pull --all`.
+
 ## [0.1.0] — unreleased
 
 ### Added

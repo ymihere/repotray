@@ -53,6 +53,9 @@ def test_demo_label_and_icon():
     cfg = Config()
     assert label_text(DEMO, cfg) == "↑3 ↓3"
     assert icon_spec(DEMO, cfg) == IconSpec("attention", "success", "warning", None)
+    assert icon_spec(DEMO, cfg).marker == "arrow"
+    dots = Config(indicator=IndicatorConfig(marker="dot"))
+    assert icon_spec(DEMO, dots).marker == "dot"
 
 
 def test_label_parts_order_and_zero_omission():
@@ -104,26 +107,43 @@ def test_hex_mode_flag():
 # --- panel model ----------------------------------------------------------------------------------
 
 
-def test_demo_rows():
-    m = panel_model(DEMO, Config(), NOW)
-    assert m.columns_title == ("Push (3)", "Pull (3)")
-    rows = [
+def row_tuples(m):
+    return [
         (r.left.name if r.left else None, bool(r.sync), r.right.name if r.right else None)
         for r in m.rows
     ]
-    assert rows == [
+
+
+def test_demo_rows():
+    m = panel_model(DEMO, Config(), NOW)
+    assert m.columns_title == ("Push (3)", "Pull (3)")
+    # One repo per row, alphabetical; push cells left, pull cells right, sync when diverged.
+    assert row_tuples(m) == [
+        ("api-gateway", False, None),
         ("design-system", True, "design-system"),
-        ("api-gateway", False, "mobile-app"),
-        ("infra", False, "website"),
+        ("infra", False, None),
+        (None, False, "mobile-app"),
+        (None, False, "website"),
     ]
-    shared = m.rows[0]
+    shared = m.rows[1]
     assert not shared.left.button.enabled and shared.left.button.tooltip == "Diverged — use Sync"
     assert not shared.right.button.enabled
     assert shared.sync.enabled and shared.sync.tooltip == "Sync: pull --rebase, then push"
-    api = m.rows[1].left
+    api = m.rows[0].left
     assert api.count_text == "↑3" and api.dirty
     assert api.button.enabled and api.button.tooltip == "Push 3 commits to origin/main"
-    assert m.rows[2].right.button.tooltip == "Pull 4 commits from origin/main (fast-forward)"
+    assert m.rows[4].right.button.tooltip == "Pull 4 commits from origin/main (fast-forward)"
+
+
+def test_rows_sorted_by_state():
+    m = panel_model(DEMO, Config(panel_sort="state"), NOW)
+    assert row_tuples(m) == [
+        ("design-system", True, "design-system"),
+        ("api-gateway", False, None),
+        ("infra", False, None),
+        (None, False, "mobile-app"),
+        (None, False, "website"),
+    ]
     assert m.empty_text is None
     assert m.header.summary == "7 repos need attention"
     assert m.header.fetched_text == "Fetched 3 min ago"
@@ -170,12 +190,12 @@ def test_busy_buttons():
     assert not row.left.button.busy and row.left.button.tooltip == "Busy: syncing…"
 
 
-def test_rows_zip_and_sort():
-    s = snap(st("b", ahead=1), st("A", ahead=1), st("z", behind=1))
-    rows = panel_model(s, Config(), NOW).rows
-    assert [(r.left and r.left.name, r.right and r.right.name) for r in rows] == [
-        ("A", "z"),
-        ("b", None),
+def test_rows_one_repo_each_case_insensitive():
+    s = snap(st("b", ahead=1), st("A", ahead=1), st("Z", behind=1), st("c"))
+    assert row_tuples(panel_model(s, Config(), NOW)) == [
+        ("A", False, None),
+        ("b", False, None),
+        (None, False, "Z"),
     ]
 
 
@@ -183,7 +203,7 @@ def test_empty_state_and_summary():
     m = panel_model(snap(st("a"), st("b")), Config(), NOW)
     assert m.rows == () and m.empty_text == "Nothing to push or pull"
     assert m.header.summary == "All 2 repos in sync"
-    assert not m.footer.sync_all.enabled
+    assert not m.bulk.sync.enabled and not m.bulk.push.enabled and not m.bulk.pull.enabled
 
 
 def test_header_states():
@@ -199,12 +219,18 @@ def test_header_states():
     ).header.fetched_text == ("Never fetched")
 
 
-def test_footer_sync_all():
-    m = panel_model(DEMO, Config(), NOW)
-    assert m.footer.label == "Sync all" and m.footer.sync_all.enabled
-    assert "push 2" in m.footer.sync_all.tooltip and "sync 1" in m.footer.sync_all.tooltip
-    m2 = panel_model(replace(DEMO, sync_all=(2, 5)), Config(), NOW)
-    assert m2.footer.label == "Syncing 2/5…" and m2.footer.sync_all.busy
+def test_bulk_buttons():
+    b = panel_model(DEMO, Config(), NOW).bulk
+    assert (b.push.label, b.sync.label, b.pull.label) == ("Push all", "Sync all", "Pull all")
+    assert b.push.enabled and b.sync.enabled and b.pull.enabled
+    assert b.push.tooltip.startswith("Push 2 repos: api-gateway, infra; skips design-system")
+    assert b.pull.tooltip.startswith("Pull 2 repos: mobile-app, website")
+    assert "push 2" in b.sync.tooltip and "sync 1" in b.sync.tooltip
+    running = panel_model(replace(DEMO, bulk=(ActionKind.SYNC, 2, 5)), Config(), NOW).bulk
+    assert running.sync.label == "Syncing 2/5…" and running.sync.busy
+    assert not running.push.enabled and "Sync all is running" in running.push.tooltip
+    pushing = panel_model(replace(DEMO, bulk=(ActionKind.PUSH, 0, 2)), Config(), NOW).bulk
+    assert pushing.push.label == "Pushing 0/2…" and not pushing.pull.enabled
 
 
 def result(ok, end, name="api-gateway", action=ActionKind.PUSH, msg="x"):
@@ -267,8 +293,13 @@ def test_fallback_menu():
     assert "Sync design-system  ↑2 ↓2" in ls
     assert "Push api-gateway  ↑3 ✎" in ls
     assert ls[-7:] == labels(control_menu(DEMO))
-    sync_all = next(i for i in items if i.action == "sync_all")
-    assert sync_all.enabled
+    bulk = {i.action: i for i in items if i.action in ("push_all", "pull_all", "sync_all")}
+    assert [bulk[a].label for a in ("push_all", "pull_all", "sync_all")] == [
+        "Push all",
+        "Pull all",
+        "Sync all",
+    ]
+    assert all(i.enabled for i in bulk.values())
     groups = [i for i in items if i.children]
     assert groups and all(isinstance(c, MenuItem) for g in groups for c in g.children)
 

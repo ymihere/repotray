@@ -65,7 +65,7 @@ def snapshot_for(state: str, now: float):
             s, all_fetches_failed=True, fetch_mode=FetchMode.BACKOFF, next_fetch_at=now + 480
         )
     elif state == "syncall":
-        s = replace(s, sync_all=(2, 5), running={by["website"].path: ActionKind.PULL})
+        s = replace(s, bulk=(ActionKind.SYNC, 2, 5), running={by["website"].path: ActionKind.PULL})
     return s
 
 

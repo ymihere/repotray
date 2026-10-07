@@ -318,33 +318,48 @@ def smart_kind(s: RepoState) -> ActionKind | None:
     return None
 
 
+BULK_NAMES = {ActionKind.PUSH: "Push all", ActionKind.PULL: "Pull all", ActionKind.SYNC: "Sync all"}
+_BULK_DONE = {ActionKind.PUSH: "Pushed", ActionKind.PULL: "Pulled", ActionKind.SYNC: "Synced"}
+
+
 @dataclass(frozen=True, slots=True)
-class SyncAllPlan:
+class BulkPlan:
+    kind: ActionKind
     jobs: tuple[tuple[ActionKind, RepoInfo], ...]
     skipped: tuple[tuple[str, str], ...]  # (name, reason)
 
 
-def plan_sync_all(states: Iterable[RepoState]) -> SyncAllPlan:
+def plan_bulk(kind: ActionKind, states: Iterable[RepoState]) -> BulkPlan:
+    """What Push all / Pull all / Sync all would do, computed from a snapshot.
+
+    Push all pushes every repo that is only ahead, Pull all pulls every repo that is only behind,
+    Sync all does both and also syncs diverged repos. Diverged repos are listed as skipped by
+    Push all / Pull all; repos whose action is blocked (e.g. uncommitted changes) are skipped.
+    """
     jobs: list[tuple[ActionKind, RepoInfo]] = []
     skipped: list[tuple[str, str]] = []
     for s in states:
-        kind = smart_kind(s)
-        if kind is None:
+        k = smart_kind(s)
+        if k is None:
             continue
-        reason = block_reason(kind, s)
+        if kind is not ActionKind.SYNC and k is not kind:
+            if k is ActionKind.SYNC:
+                skipped.append((s.name, "Diverged — use Sync"))
+            continue
+        reason = block_reason(k, s)
         if reason:
             skipped.append((s.name, reason))
         else:
-            jobs.append((kind, s.info))
-    return SyncAllPlan(tuple(jobs), tuple(skipped))
+            jobs.append((k, s.info))
+    return BulkPlan(kind, tuple(jobs), tuple(skipped))
 
 
-def summarize_sync_all(
-    plan: SyncAllPlan, results: Sequence[ActionResult], started: float, now: float
+def summarize_bulk(
+    plan: BulkPlan, results: Sequence[ActionResult], started: float, now: float
 ) -> ActionResult:
     ok = [r for r in results if r.ok]
     failed = [r for r in results if not r.ok]
-    parts = [f"Synced {len(ok)} of {len(results)}"]
+    parts = [f"{_BULK_DONE[plan.kind]} {len(ok)} of {len(results)}"]
     if failed:
         parts.append(f"{len(failed)} failed")
     if plan.skipped:
@@ -354,17 +369,17 @@ def summarize_sync_all(
         detail = "; ".join(f"{r}: {', '.join(n)}" for r, n in reasons.items())
         parts.append(f"{len(plan.skipped)} skipped ({detail})")
     if not results and not plan.skipped:
-        parts = ["Nothing to sync"]
+        parts = [f"Nothing to {plan.kind.value}"]
     details = "\n".join(
         f"{'ok ' if r.ok else 'FAIL'} {r.action.value:5} {r.name}: {r.message}" for r in results
     )
     return ActionResult(
         repo=Path(),
-        action=ActionKind.SYNC,
+        action=plan.kind,
         ok=not failed,
         message=" · ".join(parts),
         stdout=details,
         started_at=started,
         duration=now - started,
-        name="Sync all",
+        name=BULK_NAMES[plan.kind],
     )

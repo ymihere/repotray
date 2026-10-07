@@ -16,6 +16,7 @@ from repotray.core.model import (
     ICON_DIRTY,
     ICON_GEAR,
     ICON_WARNING,
+    BulkButton,
     Button,
     Cell,
     PanelModel,
@@ -57,6 +58,30 @@ def _clear(box: Gtk.Container) -> None:
         child.destroy()
 
 
+class BulkWidget(Gtk.Button):
+    """A Push all / Sync all / Pull all button: icon (spinner while busy) and label."""
+
+    def __init__(self, kind: ActionKind, action: str, dispatch) -> None:
+        super().__init__()
+        box = Gtk.Box(spacing=6)
+        self.icon = _icon(ACTION_ICONS[kind], Gtk.IconSize.BUTTON)
+        self.spinner = Gtk.Spinner()
+        self.spinner.set_no_show_all(True)
+        self.label = Gtk.Label(label="")
+        for w in (self.icon, self.spinner, self.label):
+            box.pack_start(w, False, False, 0)
+        self.add(box)
+        self.connect("clicked", lambda *_: dispatch(action, None))
+
+    def set_model(self, b: BulkButton) -> None:
+        self.label.set_text(b.label)
+        self.set_sensitive(b.enabled)
+        self.set_tooltip_text(b.tooltip)
+        self.icon.set_visible(not b.busy)
+        self.spinner.set_visible(b.busy)
+        (self.spinner.start if b.busy else self.spinner.stop)()
+
+
 class PanelView(Gtk.Box):
     """Everything inside the panel window. Usable offscreen for screenshots and tests."""
 
@@ -93,6 +118,12 @@ class PanelView(Gtk.Box):
         self.header.pack_start(self.fetched, False, False, 0)
         self.header.pack_start(self.refresh_btn, False, False, 0)
         self.header.pack_start(self.header_spinner, False, False, 6)
+        self.gear = Gtk.MenuButton()
+        self.gear.add(_icon(ICON_GEAR, Gtk.IconSize.BUTTON))
+        self.gear.set_tooltip_text("Settings and more")
+        self.gear.set_relief(Gtk.ReliefStyle.NONE)
+        self.gear.get_style_context().add_class("rt-action")
+        self.header.pack_start(self.gear, False, False, 0)
         self.pack_start(self.header, False, False, 0)
 
         self.warning = _label("", "dim-label", wrap=True)
@@ -109,6 +140,17 @@ class PanelView(Gtk.Box):
         self.details_btn = self.banner.add_button("Details…", 1)
         self.banner.connect("response", self._on_banner_response)
         self.pack_start(self.banner, False, False, 0)
+
+        # Push all · Sync all · Pull all, above the columns they act on
+        bar = Gtk.Box(spacing=6)
+        self.push_all = BulkWidget(ActionKind.PUSH, "push_all", self.dispatch)
+        self.sync_all = BulkWidget(ActionKind.SYNC, "sync_all", self.dispatch)
+        self.pull_all = BulkWidget(ActionKind.PULL, "pull_all", self.dispatch)
+        self.sync_all.get_style_context().add_class("suggested-action")
+        bar.pack_start(self.push_all, False, False, 0)
+        bar.set_center_widget(self.sync_all)
+        bar.pack_end(self.pull_all, False, False, 0)
+        self.pack_start(bar, False, False, 2)
 
         self.pack_start(Gtk.Separator(), False, False, 2)
 
@@ -138,32 +180,6 @@ class PanelView(Gtk.Box):
         self.pack_start(self.groups, False, False, 0)
         self.expanded = False
 
-        self.pack_start(Gtk.Separator(), False, False, 2)
-
-        # Footer
-        footer = Gtk.Box(spacing=6)
-        self.sync_all = Gtk.Button()
-        self.sync_all.get_style_context().add_class("suggested-action")
-        sync_box = Gtk.Box(spacing=6)
-        self.sync_all_icon = _icon(ACTION_ICONS[ActionKind.SYNC], Gtk.IconSize.BUTTON)
-        self.sync_all_spinner = Gtk.Spinner()
-        self.sync_all_spinner.set_no_show_all(True)
-        self.sync_all_label = Gtk.Label(label="Sync all")
-        sync_box.pack_start(self.sync_all_icon, False, False, 0)
-        sync_box.pack_start(self.sync_all_spinner, False, False, 0)
-        sync_box.pack_start(self.sync_all_label, False, False, 0)
-        self.sync_all.add(sync_box)
-        self.sync_all.connect("clicked", lambda *_: self.dispatch("sync_all", None))
-        footer.pack_start(self.sync_all, False, False, 0)
-        self.gear = Gtk.MenuButton()
-        gear_box = Gtk.Box(spacing=2)
-        gear_box.pack_start(_icon(ICON_GEAR, Gtk.IconSize.BUTTON), False, False, 0)
-        gear_box.pack_start(_icon("pan-down-symbolic", Gtk.IconSize.MENU), False, False, 0)
-        self.gear.add(gear_box)
-        self.gear.set_tooltip_text("Settings and more")
-        self.gear.set_relief(Gtk.ReliefStyle.NONE)
-        footer.pack_end(self.gear, False, False, 0)
-        self.pack_start(footer, False, False, 0)
         self.show_all()
         # Visibility of these follows the model; a later show_all() must not reveal them.
         for w in (self.empty, self.titles, self.scroller, self.sep2, self.refresh_btn):
@@ -257,8 +273,10 @@ class PanelView(Gtk.Box):
             self._set_rows(m)
         if old is None or old.groups != m.groups:
             self._set_groups(m)
-        if old is None or old.footer != m.footer:
-            self._set_footer(m)
+        if old is None or old.bulk != m.bulk:
+            self.push_all.set_model(m.bulk.push)
+            self.sync_all.set_model(m.bulk.sync)
+            self.pull_all.set_model(m.bulk.pull)
 
     def _set_header(self, m: PanelModel) -> None:
         h = m.header
@@ -384,16 +402,6 @@ class PanelView(Gtk.Box):
 
     def _on_expanded(self, expander: Gtk.Expander, _pspec) -> None:
         self.expanded = expander.get_expanded()
-
-    def _set_footer(self, m: PanelModel) -> None:
-        f = m.footer
-        self.sync_all_label.set_text(f.label)
-        self.sync_all.set_sensitive(f.sync_all.enabled)
-        self.sync_all.set_tooltip_text(f.sync_all.tooltip)
-        busy = f.sync_all.busy
-        self.sync_all_icon.set_visible(not busy)
-        self.sync_all_spinner.set_visible(busy)
-        (self.sync_all_spinner.start if busy else self.sync_all_spinner.stop)()
 
 
 class Panel(Gtk.Window):

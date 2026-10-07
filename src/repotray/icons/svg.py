@@ -36,28 +36,39 @@ def resolve(color: str | None, glyph_color: str) -> str:
     return geometry()["fallback"][color]
 
 
-def variant(spec: IconSpec) -> str:
+def variant(spec: IconSpec) -> tuple[str, str]:
+    """(marker shape, knockout variant) of the glyph to draw."""
     if spec.state in ("error", "paused"):
-        return "bottom"
+        return "dot", "bottom"  # the cross and bars sit in the dot-shaped knockout
     top, bottom = bool(spec.top), bool(spec.bottom)
-    return {(False, False): "none", (True, False): "top", (False, True): "bottom"}.get(
+    key = {(False, False): "none", (True, False): "top", (False, True): "bottom"}.get(
         (top, bottom), "both"
     )
+    return spec.marker, key
+
+
+def glyph_rings(spec: IconSpec) -> list:
+    shape, key = variant(spec)
+    return geometry()["glyph"][shape][key]
 
 
 def render_svg(spec: IconSpec) -> str:
     g = geometry()
     glyph = resolve(spec.tint, spec.glyph_color)
-    els = [f'<path d="{path_d(g["glyph"][variant(spec)])}" fill-rule="evenodd" fill="{glyph}"/>']
+    els = [f'<path d="{path_d(glyph_rings(spec))}" fill-rule="evenodd" fill="{glyph}"/>']
     if spec.state == "error":
         els.append(f'<path d="{path_d(g["cross"])}" fill="{resolve("error", spec.glyph_color)}"/>')
     elif spec.state == "paused":
         els.append(f'<path d="{path_d(g["bars"])}" fill="{spec.glyph_color}"/>')
     else:
         for corner, color in (("top", spec.top), ("bottom", spec.bottom)):
-            if color:
+            if not color:
+                continue
+            fill = resolve(color, spec.glyph_color)
+            if spec.marker == "arrow":
+                els.append(f'<path d="{path_d(g["arrows"][corner])}" fill="{fill}"/>')
+            else:
                 cx, cy, r = g["dots"][corner]
-                fill = resolve(color, spec.glyph_color)
                 els.append(f'<circle cx="{cx:g}" cy="{cy:g}" r="{r:g}" fill="{fill}"/>')
     body = "\n".join(els)
     return (

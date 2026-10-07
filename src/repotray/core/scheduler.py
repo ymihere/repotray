@@ -20,9 +20,9 @@ from pathlib import Path
 from repotray.core.actions import (
     ActionContext,
     RepoLocks,
-    plan_sync_all,
+    plan_bulk,
     run_action,
-    summarize_sync_all,
+    summarize_bulk,
 )
 from repotray.core.config import Config, ConfigWatcher
 from repotray.core.gitrun import Runner, git_available
@@ -90,7 +90,7 @@ class Scheduler:
         self.git_missing = False
         self.last_fetch_pass_at: float | None = None
         self.fetch_delay = float(cfg.fetch_interval)
-        self.sync_all_progress: tuple[int, int] | None = None
+        self.bulk_progress: tuple[ActionKind, int, int] | None = None
         self.scan_warnings: list[str] = []
         self._scan_key = None
         self._started = False
@@ -151,7 +151,13 @@ class Scheduler:
         self._post(lambda: self._submit_action(kind, path))
 
     def sync_all(self) -> None:
-        self._post(self._start_sync_all)
+        self._post(lambda: self._start_bulk(ActionKind.SYNC))
+
+    def push_all(self) -> None:
+        self._post(lambda: self._start_bulk(ActionKind.PUSH))
+
+    def pull_all(self) -> None:
+        self._post(lambda: self._start_bulk(ActionKind.PULL))
 
     # ----- loop --------------------------------------------------------------------------------
 
@@ -459,24 +465,25 @@ class Scheduler:
         if emit:
             self._emit()
 
-    def _start_sync_all(self) -> None:
-        if self.sync_all_progress is not None:
+    def _start_bulk(self, bulk_kind: ActionKind) -> None:
+        """Push all / Pull all / Sync all. One bulk operation at a time."""
+        if self.bulk_progress is not None:
             return
-        plan = plan_sync_all(s for s in self.states.values() if s.path not in self.running)
+        plan = plan_bulk(bulk_kind, (s for s in self.states.values() if s.path not in self.running))
         started = self.clock()
         if not plan.jobs:
-            self._record(summarize_sync_all(plan, [], started, self.clock()))
+            self._record(summarize_bulk(plan, [], started, self.clock()))
             return
         total = len(plan.jobs)
-        self.sync_all_progress = (0, total)
+        self.bulk_progress = (bulk_kind, 0, total)
         collected: list[ActionResult] = []
 
         def one_done(res: ActionResult) -> None:
             collected.append(res)
-            self.sync_all_progress = (len(collected), total)
+            self.bulk_progress = (bulk_kind, len(collected), total)
             if len(collected) == total:
-                self.sync_all_progress = None
-                self._record(summarize_sync_all(plan, collected, started, self.clock()))
+                self.bulk_progress = None
+                self._record(summarize_bulk(plan, collected, started, self.clock()))
             else:
                 self._emit()
 
@@ -516,7 +523,7 @@ class Scheduler:
             all_fetches_failed=self.all_fetches_failed,
             git_missing=self.git_missing,
             running=dict(self.running),
-            sync_all=self.sync_all_progress,
+            bulk=self.bulk_progress,
             recent_results=tuple(self.results),
             config_warning=warning,
         )

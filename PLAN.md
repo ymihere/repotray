@@ -8,7 +8,10 @@ absent on other machines) → `SPEC.md` (behaviour) → this file (structure, in
 
 **Precedence.** SPEC.md defines *what* repotray does. PLAN.md defines *how* it is built and settles
 everything SPEC left open. Where they disagree, PLAN.md is newer: implement PLAN.md and fix SPEC.md in
-the same commit.
+the same commit. **Exception:** changes the maintainer requested after 0.1.0 (2026-10-07: ▲/▼ arrow
+markers, one panel row per repo with `panel_sort`, Push all / Pull all / Sync all at the top of the
+panel) are specified in SPEC.md and logged in docs/decisions.md; where this plan still describes the
+earlier dots-only icons, zipped rows or the footer, SPEC.md wins.
 
 ---
 

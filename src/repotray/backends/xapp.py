@@ -60,6 +60,12 @@ class XAppBackend(GtkBackendBase):
             self._icon_name = ref
             self.icon.set_icon_name(ref)
 
+    def reload_icon(self) -> None:
+        """Make the applet look the icon up again (after new icon files were installed)."""
+        if self._icon_name:
+            self.icon.set_icon_name("image-missing")
+            self.icon.set_icon_name(self._icon_name)
+
     def set_label(self, text: str) -> None:
         if text != self._label:
             self._label = text

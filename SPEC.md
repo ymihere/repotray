@@ -41,16 +41,18 @@ as the last `git fetch`. repotray fetches itself (see §4).
 - Monochrome glyph, transparent background, recolored by the desktop (details §6).
 - States:
   - `clean` — the base glyph.
-  - `attention` — the base glyph plus up to two **corner dots** in the style of
-    Mint's update icon (a filled circle in the bottom-right corner, the glyph cut
-    away around it), and/or a **tint** of the whole glyph. The top-right dot, the
-    bottom-right dot and the tint each have their own trigger set drawn from `push`
+  - `attention` — the base glyph plus up to two **corner markers** (the glyph cut
+    away around each, like Mint's update icon does around its dot), and/or a **tint**
+    of the whole glyph. The markers are **arrows** by default — a ▲ in the top-right
+    corner, a ▼ in the bottom-right corner — or round **dots** exactly like Mint's
+    update icon (`marker = "dot"`, decided 2026-10-07). The top-right marker, the
+    bottom-right marker and the tint each have their own trigger set drawn from `push`
     (≥ 1 repo pushable), `pull` (≥ 1 repo behind) and `dirty` (≥ 1 repo with
-    uncommitted changes), and their own theme colour. Default: top-right green dot =
-    something to push (up), bottom-right orange dot = something to pull (down, the
-    exact spot and colour of "updates available"), both at once when both hold, no
-    tint. Any of the three can be switched off; with all off the icon never changes
-    and only the label signals work.
+    uncommitted changes), and their own theme colour. Default: green ▲ top-right =
+    something to push, orange ▼ bottom-right = something to pull (the spot and colour
+    of "updates available"), both at once when both hold, no tint. Any of the three can
+    be switched off; with all off the icon never changes and only the label signals
+    work.
   - `error` — the last fetch pass failed for every repo (probably offline) or git is
     missing. The cross is drawn in the theme's error colour, as the mintupdate error
     icon does with its glyph.
@@ -101,7 +103,8 @@ Fetched 3 min ago
   click type loses nothing.
 - Backends that cannot show a popup window (`caps.panel = false`, e.g. pystray)
   render the panel model as a menu instead: the groups of §2.2 with one *Push* /
-  *Pull* / *Sync* item per repo, *Sync all*, then the control items below a
+  *Pull* / *Sync* item per repo, *Push all*, *Pull all*, *Sync all*, then the control
+  items below a
   separator. AppIndicator delivers no click events at all (left click always opens
   its menu), so there the menu starts with *Open panel…* and middle click
   (`secondary-activate`) opens the panel at the pointer; `Gtk.StatusIcon` has
@@ -124,7 +127,8 @@ labelled button.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│ 3 repos need attention                       Fetched 3 min ago   (⟳) │
+│ 3 repos need attention                   Fetched 3 min ago   (⟳) (⚙) │
+│ [ ↑ Push all ]              [ ⇅ Sync all ]              [ ↓ Pull all ] │
 ├──────────────────────────────────────────────────────────────────────┤
 │ Push (2)                                                    Pull (2) │
 │ api-gateway   ↑3 ✎   (↑)        (⇅)           (↓)   ↓4   api-gateway │
@@ -134,8 +138,6 @@ labelled button.
 │ ✎ Uncommitted (3)   api-gateway · notes · scratch                    │
 │ ⚠ No upstream (1)   experiments                                      │
 │ ▸ In sync (8)                                                        │
-├──────────────────────────────────────────────────────────────────────┤
-│ [ ⇅ Sync all ]                                               [ ⚙ ▾ ] │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -143,16 +145,29 @@ labelled button.
 attention`, `Fetching…`, `Offline — fetch failed for every repo, retrying in 8 min`,
 `Fetching paused · Resume` — and on the right `Fetched 3 min ago` (relative, refreshed
 every minute while open) plus a *Fetch all now* icon button that spins during a fetch
-pass. A manual fetch resets the error back-off.
+pass, and the gear menu button. A manual fetch resets the error back-off. The gear holds
+the control items of the right-click menu: *Fetch all now*, *Pause fetching* (check),
+*Rescan roots*, *Open config file* (the v1 "settings"; no dialog, see §10), *Autostart*
+(check), *About*, *Quit*.
+
+**Bulk buttons** (below the header, decided 2026-10-07): *Push all* on the left above the
+push column, *Pull all* on the right above the pull column, *Sync all* — the primary
+button — in the middle. Push all pushes every repo that is only ahead; Pull all pulls
+every repo that is only behind; Sync all does both and syncs the non-dirty diverged
+repos (§4.1). Each is disabled with a tooltip when it has nothing to do, its tooltip
+lists the repos it will act on and those it skips, and it shows `Pushing 1/3…` /
+`Pulling …` / `Syncing 2/5…` with a spinner while running. One bulk action at a time.
 
 **Columns.** Left `Push (N)`: repos whose branch is ahead of its upstream. Right
-`Pull (N)`: repos behind. The columns mirror each other so that the action buttons
-meet in the middle gutter: a left row reads `name  ↑3 ✎  (push)`, a right row
-`(pull)  ↓4  name`. A *diverged* repo (ahead and behind) occupies one shared row in
-both columns with a *Sync* button in the gutter; its push and pull buttons are shown
+`Pull (N)`: repos behind. **Each repo has exactly one row** (decided 2026-10-07): a
+pushable repo has its cell on the left (`name  ↑3 ✎  (push)`), a pullable one on the
+right (`(pull)  ↓4  name`), so the action buttons meet in the middle gutter; push-only
+and pull-only repos never share a row. A *diverged* repo (ahead and behind) fills both
+sides of its row with a *Sync* button in the gutter; its push and pull buttons are shown
 disabled (tooltip "Diverged — use Sync") because a push would be rejected and a
-fast-forward pull is impossible. Shared rows come first, then push-only and pull-only
-rows fill their columns independently, sorted by name. Clean repos never appear here.
+fast-forward pull is impossible. Rows are sorted alphabetically; with
+`panel_sort = "state"` syncable repos come first, then pushable, then pullable, each
+alphabetically. Clean repos never appear here.
 When nothing is pushable or pullable the columns are replaced by a single centred
 `Nothing to push or pull` line.
 
@@ -180,12 +195,6 @@ the same context menu):
   `⚠ Fetch failed (N)` (tooltip: the error), `⚠ Unreadable (N)` (`git status` failed).
 - `▸ In sync (N)` — collapsed expander listing the clean repos, so one can confirm
   that a repo is being watched without the CLI.
-
-**Footer.** *Sync all* on the left: the one labelled, primary button. Disabled with a
-tooltip when there is nothing to do; shows `Syncing 2/5…` while running. A gear menu
-button on the right holds the control items of the right-click menu: *Fetch all now*,
-*Pause fetching* (check), *Rescan roots*, *Open config file* (the v1 "settings"; no
-dialog, see §10), *Autostart* (check), *About*, *Quit*.
 
 **Window behaviour.** Toggled by left click; closes on Escape, on focus loss, or on a
 second click on the icon. Updates live from every snapshot while open. Keyboard: Tab
@@ -238,7 +247,8 @@ monitor work area. Backends without that information open it at the pointer.
   optimisation; polling is acceptable for v1.
 
 ### 4.1 Actions: push, pull, sync
-Only ever triggered by the user: a panel button, *Sync all*, or the CLI (§8). They run
+Only ever triggered by the user: a panel button, *Push all* / *Pull all* / *Sync all*,
+or the CLI (§8). They run
 on the fetch worker pool, off the UI thread, with the same non-prompting environment
 as fetch — so a remote that would need interactive credentials fails fast with a clear
 message instead of hanging.
@@ -254,9 +264,11 @@ message instead of hanging.
   rebase is exactly the mess this tool should not create. If the rebase/merge stops on
   conflicts, repotray runs `git rebase --abort` / `git merge --abort` and reports the
   failure, so the repo ends up exactly as it was.
-- **Sync all** = push every push-only row, pull every pull-only row, sync every
-  non-dirty diverged row. Dirty diverged repos are skipped and named in the result.
-  Concurrency `fetch_workers`; no cancel in v1.
+- **Push all** = push every push-only repo; **Pull all** = pull every pull-only repo
+  (diverged repos are skipped with "Diverged — use Sync"). **Sync all** = push every
+  push-only repo, pull every pull-only repo, sync every non-dirty diverged repo. Repos
+  whose action is blocked (dirty diverged, operation in progress) are skipped and named
+  in the result. Concurrency `fetch_workers`; one bulk action at a time; no cancel in v1.
 - A per-repo lock serialises fetch, pull, push and sync on one repo; status reads are
   never locked. A status pass for the repo runs right after each action.
 - Timeout `action_timeout` (default 120 s): the process group is killed, then the repo
@@ -308,9 +320,10 @@ log_level = "info"
 
 [indicator]                       # what the tray icon signals; see §2.1 and §6
 label = ["push", "pull"]          # parts next to the icon: push ↑N, pull ↓N, dirty ✎N; [] = no label
-top_dot = ["push"]                # top-right dot, shown when any of push / pull / dirty applies; [] = never
+marker = "arrow"                  # corner markers: "arrow" (▲ top-right, ▼ bottom-right) or "dot"
+top_dot = ["push"]                # top-right marker, shown when any of push / pull / dirty applies; [] = never
 top_dot_color = "success"         # foreground | warning | error | success | "#rrggbb"
-bottom_dot = ["pull"]             # bottom-right dot: the spot Mint's update icon uses
+bottom_dot = ["pull"]             # bottom-right marker: the spot Mint's update icon uses
 bottom_dot_color = "warning"      # "warning" is the colour of "updates available"
 tint = []                         # recolour the whole glyph when any of these apply; [] = never
 tint_color = "warning"            # warning | error | success | "#rrggbb"
@@ -321,9 +334,9 @@ fetch = false
 name = "monorepo"                  # optional display name
 ```
 
-Three `[indicator]` examples. *Default:* green dot top-right when you have commits to
-push, orange dot bottom-right when someone else pushed, both when both. *Like
-mintupdate:* `top_dot = []`, `bottom_dot = ["push", "pull", "dirty"]` → one orange dot
+Three `[indicator]` examples. *Default:* green ▲ top-right when you have commits to
+push, orange ▼ bottom-right when someone else pushed, both when both. *Like
+mintupdate:* `marker = "dot"`, `top_dot = []`, `bottom_dot = ["push", "pull", "dirty"]` → one orange dot
 bottom-right whenever anything needs doing, indistinguishable in style from the
 update icon next to it. *Quiet:* `label = []`, `top_dot = []`, `bottom_dot = []`,
 `tint = ["push", "pull", "dirty"]` → no numbers, no dots, the glyph itself turns
@@ -360,18 +373,24 @@ orange when anything needs doing.
   bottom-right corner; the glyph path is cut away in a radius-4 circle around the
   dot, leaving a 1 px transparent ring that keeps the dot legible on any background.
   `mintupdate-error-symbolic.svg` gives its glyph `class="error"` (`#e01b24`).
-  repotray copies this geometry exactly: **bottom-right dot** centred (13, 13),
-  **top-right dot** centred (13, 3), both radius 3 with a radius-4 knockout; the
+  With `marker = "dot"` repotray copies this geometry exactly: **bottom-right dot**
+  centred (13, 13), **top-right dot** centred (13, 3), both radius 3 with a radius-4
+  knockout. The default **arrows** occupy the same corners: a ▲ with apex (12.5, 0) and
+  base y = 6 from x = 9 to 16, a ▼ with base y = 10 from x = 9 to 16 and apex (12.5, 16),
+  each knocked out of the glyph with a 1 px margin (7 px wide so they stay legible at
+  16 px; chosen from rendered candidates 2026-10-07). The
   fallback fills are `#f57900` warning, `#e01b24` error, `#2ec27e` success,
   `#bebebe` foreground (only renderers without class support ever see them).
 - The knockout is baked into the glyph path by the build script (boolean
   difference), never done with an SVG mask or clip: GTK's symbolic loader rewrites
   the fills of every element, which would recolour a mask too. One template holds
   the glyph, the two dot circles and the cross/bars; the script emits every
-  combination `repotray[-tint-<c>][-top-<c>][-bottom-<c>]-symbolic.svg` with tint ∈
-  {warning, error, success} and each dot ∈ {foreground, warning, error, success}
-  (4 × 5 × 5 = 100 small files, ≈ 1 KB each, incl. the plain `repotray-symbolic.svg`),
-  plus `repotray-error-symbolic.svg` and `repotray-paused-symbolic.svg`. Static files
+  combination `repotray[-tint-<c>][-top-<c>][-bottom-<c>]-symbolic.svg` (dots) and
+  `repotray[-tint-<c>][-up-<c>][-down-<c>]-symbolic.svg` (arrows) with tint ∈
+  {warning, error, success} and each marker ∈ {foreground, warning, error, success}
+  (100 dot files incl. the plain `repotray-symbolic.svg`, 96 arrow files — the
+  marker-less ones are shared — ≈ 1 KB each), plus `repotray-error-symbolic.svg` and
+  `repotray-paused-symbolic.svg`. Static files
   rather than runtime generation, so system-wide installs and icon-theme caches need
   no special handling. The backend composes the name from the `IconSpec` (§7).
 - A `#rrggbb` colour in `[indicator]` forces **full-colour mode**: repotray renders the
@@ -484,8 +503,9 @@ repotray [tray] [--demo]         start the tray (default); --demo shows fabricat
 repotray status [--json] [--demo]  one status pass, print table or JSON, exit
 repotray scan [--absolute]       list discovered repos and exit
 repotray fetch [REPO...]         fetch pass + status, exit
-repotray push REPO...            git push (§4.1); REPO = name, basename or path
-repotray pull REPO...            git pull --ff-only
+repotray push [--all | REPO...]  git push (§4.1); REPO = name, basename or path;
+                                 --all = Push all
+repotray pull [--all | REPO...]  git pull --ff-only; --all = Pull all
 repotray sync [--all | REPO...]  per repo: push if ahead, pull --ff-only if behind,
                                  pull --rebase + push if diverged; --all = Sync all
 repotray doctor                  environment, config, backends and icons report
@@ -511,7 +531,7 @@ without any GUI. Exit codes and the JSON schema: PLAN §4.14.
   diverged → sync rebases and pushes; diverged with a conflicting edit → sync aborts
   and HEAD, index and working tree are identical to before; dirty diverged → sync
   refused without running git; a remote needing credentials fails fast, no hang.
-- Model tests: `PanelModel` row allocation (shared rows first, then by name), button
+- Model tests: `PanelModel` rows (one per repo, by name or by state), bulk buttons, button
   enablement rules, basename collisions, empty state, menu fallback rendering.
 - Indicator tests: label parts and omission of zeros, top-dot / bottom-dot / tint
   trigger sets (incl. `count_no_upstream_as_push`), error/paused precedence, icon name

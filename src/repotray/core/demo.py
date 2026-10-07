@@ -12,7 +12,7 @@ from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 
-from repotray.core.actions import block_reason, plan_sync_all, summarize_sync_all
+from repotray.core.actions import block_reason, plan_bulk, summarize_bulk
 from repotray.core.config import Config, ConfigWatcher
 from repotray.core.types import (
     ActionKind,
@@ -105,7 +105,7 @@ class DemoScheduler:
         self.paused = False
         self.fetching = False
         self.last_fetch = now - 180
-        self.sync_all_progress: tuple[int, int] | None = None
+        self.bulk_progress: tuple[ActionKind, int, int] | None = None
         self._listeners: list[Callable[[Snapshot], None]] = []
         self._result_listeners: list[Callable[[ActionResult], None]] = []
         self._lock = threading.RLock()
@@ -154,7 +154,7 @@ class DemoScheduler:
                 last_fetch_pass_at=self.last_fetch,
                 next_fetch_at=None if self.paused else self.last_fetch + 600,
                 running=dict(self.running),
-                sync_all=self.sync_all_progress,
+                bulk=self.bulk_progress,
                 recent_results=tuple(self.results),
                 config_warning=self.watcher.warning_text,
             )
@@ -255,31 +255,44 @@ class DemoScheduler:
         )
 
     def sync_all(self) -> None:
+        self._bulk(ActionKind.SYNC)
+
+    def push_all(self) -> None:
+        self._bulk(ActionKind.PUSH)
+
+    def pull_all(self) -> None:
+        self._bulk(ActionKind.PULL)
+
+    def _bulk(self, bulk_kind: ActionKind) -> None:
         with self._lock:
-            if self.sync_all_progress is not None:
+            if self.bulk_progress is not None:
                 return
-            plan = plan_sync_all(s for s in self.states.values() if s.path not in self.running)
+            plan = plan_bulk(
+                bulk_kind, (s for s in self.states.values() if s.path not in self.running)
+            )
             started = self.clock()
             if not plan.jobs:
-                res = summarize_sync_all(plan, [], started, started)
+                res = summarize_bulk(plan, [], started, started)
                 self.results.appendleft(res)
+                for cb in list(self._result_listeners):
+                    cb(res)
                 self._emit()
                 return
             total = len(plan.jobs)
-            self.sync_all_progress = (0, total)
+            self.bulk_progress = (bulk_kind, 0, total)
             collected: list[ActionResult] = []
 
         def one_done(res: ActionResult) -> None:
             with self._lock:
                 collected.append(res)
                 if len(collected) == total:
-                    self.sync_all_progress = None
-                    summary = summarize_sync_all(plan, collected, started, self.clock())
+                    self.bulk_progress = None
+                    summary = summarize_bulk(plan, collected, started, self.clock())
                     self.results.appendleft(summary)
                     for cb in list(self._result_listeners):
                         cb(summary)
                 else:
-                    self.sync_all_progress = (len(collected), total)
+                    self.bulk_progress = (bulk_kind, len(collected), total)
 
         for i, (kind, info) in enumerate(plan.jobs):
             self.run_action(kind, info.path, on_done=one_done, delay=ACTION_SECONDS + 0.7 * i)

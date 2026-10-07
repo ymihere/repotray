@@ -23,8 +23,8 @@ repositories, the candidates are listed and nothing runs (exit 2).
 | `repotray status [--json] [--demo]` | Scan, one status pass, print a table (or JSON). No network. | 0; 2 config error |
 | `repotray scan [--absolute]` | List discovered repositories, `~`-abbreviated unless `--absolute`. | 0 |
 | `repotray fetch [REPO…]` | Fetch all (or the given) repositories, then print the status table. | 0; 1 if any fetch failed; 2 usage |
-| `repotray push REPO…` | `git push` the current branch to its upstream. | 0; 1 failed; 2 usage |
-| `repotray pull REPO…` | `git pull --ff-only`. | 0; 1 failed; 2 usage |
+| `repotray push [--all \| REPO…]` | `git push` the current branch to its upstream. `--all` = *Push all*: every repo that is only ahead (diverged ones are listed as skipped). | 0; 1 failed; 2 usage |
+| `repotray pull [--all \| REPO…]` | `git pull --ff-only`. `--all` = *Pull all*: every repo that is only behind. | 0; 1 failed; 2 usage |
 | `repotray sync [--all \| REPO…]` | Per repository: push if only ahead, pull if only behind, pull --rebase (or merge) then push if diverged; nothing if in sync. `--all` = *Sync all*. | 0; 1 failed; 2 usage |
 | `repotray doctor` | Version, Python, platform and desktop, git, config path and warnings, roots and repository count, icon installation, autostart, log path, and every backend with its probe score (`*` = selected). | 0 |
 | `repotray config path` | Print the config file path. | 0 |
@@ -34,7 +34,9 @@ repositories, the candidates are listed and nothing runs (exit 2).
 | `repotray quit` | Stop the running tray (SIGTERM to the pid in the instance lock). Not supported on Windows. | 0; 1 none running |
 
 Action results print one line per repository, `ok` on stdout or `FAIL` on stderr, e.g.
-`FAIL sync  notes: Commit or stash first`. With `-v`, failures also print the git commands and
+`FAIL sync  notes: Commit or stash first`. With `--all`, repositories that are left out print a
+`skip` line with the reason (uncommitted changes, diverged, operation in progress) and do not make
+the command fail. With `-v`, failures also print the git commands and
 their output.
 
 ## Status table

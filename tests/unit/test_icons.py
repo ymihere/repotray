@@ -17,8 +17,15 @@ from repotray.icons.svg import render_svg, write_hex_icon
 SVG_NS = "{http://www.w3.org/2000/svg}"
 ROOT = Path(__file__).resolve().parents[2]
 NAME_RE = re.compile(
-    r"repotray(?:-tint-(?P<tint>\w+))?(?:-top-(?P<top>\w+))?(?:-bottom-(?P<bottom>\w+))?-symbolic"
+    r"repotray(?:-tint-(?P<tint>\w+))?"
+    r"(?:-(?P<topword>top|up)-(?P<top>\w+))?(?:-(?P<bottomword>bottom|down)-(?P<bottom>\w+))?"
+    r"-symbolic"
 )
+# Corner triangles, as in tools/build_icons.py.
+ARROWS = {
+    "top": ((12.5, 0.0), (16.0, 6.0), (9.0, 6.0)),
+    "bottom": ((9.0, 10.0), (16.0, 10.0), (12.5, 16.0)),
+}
 
 
 def svgs():
@@ -27,7 +34,7 @@ def svgs():
 
 def test_all_files_exist_and_parse():
     files = svgs()
-    assert len(files) == 102
+    assert len(files) == 198  # 100 dot variants, 96 arrow variants, error, paused
     assert {f.stem for f in files} == set(all_names())
     for f in files:
         assert f.stat().st_size < 4096
@@ -44,32 +51,61 @@ def path_points(d: str) -> list[tuple[float, float]]:
     return list(zip(nums[::2], nums[1::2], strict=True))
 
 
+def _seg_dist(p, a, b) -> float:
+    (px, py), (ax, ay), (bx, by) = p, a, b
+    dx, dy = bx - ax, by - ay
+    t = max(0.0, min(1.0, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy)))
+    return math.hypot(px - ax - t * dx, py - ay - t * dy)
+
+
+def _triangle_dist(p, tri) -> float:
+    """Distance from p to a triangle (0 inside)."""
+    (x, y), (a, b, c) = p, tri
+
+    def side(p1, p2):
+        return (p2[0] - p1[0]) * (y - p1[1]) - (p2[1] - p1[1]) * (x - p1[0])
+
+    s1, s2, s3 = side(a, b), side(b, c), side(c, a)
+    if (s1 >= 0 and s2 >= 0 and s3 >= 0) or (s1 <= 0 and s2 <= 0 and s3 <= 0):
+        return 0.0
+    return min(_seg_dist(p, a, b), _seg_dist(p, b, c), _seg_dist(p, c, a))
+
+
 @pytest.mark.parametrize("f", svgs(), ids=lambda f: f.stem)
-def test_dots_and_knockouts(f):
+def test_markers_and_knockouts(f):
     root = ET.parse(f).getroot()
     circles = root.findall(f"{SVG_NS}circle")
-    glyph = root.findall(f"{SVG_NS}path")[0]
+    paths = root.findall(f"{SVG_NS}path")
+    glyph, extra = paths[0], paths[1:]
     m = NAME_RE.fullmatch(f.stem)
-    if m is None:  # error / paused: bottom-right knockout, no circles
-        assert not circles
+    shape = "dot"
+    if m is None:  # error / paused: bottom-right dot knockout, a mark drawn as a path
+        assert not circles and len(extra) == 1
         shown = {"bottom"}
     else:
         shown = {k for k in ("top", "bottom") if m.group(k)}
-        by_cy = {c.get("cy"): c for c in circles}
-        assert len(circles) == len(shown)
-        for corner, cy in (("top", "3"), ("bottom", "13")):
+        words = {m.group("topword"), m.group("bottomword")} - {None}
+        assert words <= {"top", "bottom"} or words <= {"up", "down"}, f.stem
+        shape = "arrow" if words & {"up", "down"} else "dot"
+        markers = circles if shape == "dot" else extra
+        assert len(markers) == len(shown) and not (circles and extra)
+        for corner, el in zip([c for c in ("top", "bottom") if m.group(c)], markers, strict=True):
             color = m.group(corner)
-            if color:
-                c = by_cy[cy]
-                assert c.get("cx") == "13" and c.get("r") == "3"
-                assert c.get("class") == (None if color == "foreground" else color)
-        tint = m.group("tint")
-        assert glyph.get("class") == tint
+            assert el.get("class") == (None if color == "foreground" else color)
+            if shape == "dot":
+                cy = {"top": "3", "bottom": "13"}[corner]
+                assert (el.get("cx"), el.get("cy"), el.get("r")) == ("13", cy, "3")
+            else:
+                assert set(path_points(el.get("d"))) == set(ARROWS[corner])
+        assert glyph.get("class") == m.group("tint")
     centers = {"top": (13, 3), "bottom": (13, 13)}
     for x, y in path_points(glyph.get("d")):
         for corner in shown:
-            cx, cy = centers[corner]
-            assert math.hypot(x - cx, y - cy) >= 3.9, (f.stem, x, y)
+            if shape == "dot":
+                cx, cy = centers[corner]
+                assert math.hypot(x - cx, y - cy) >= 3.9, (f.stem, x, y)
+            else:
+                assert _triangle_dist((x, y), ARROWS[corner]) >= 0.9, (f.stem, x, y)
 
 
 def test_error_and_paused_marks():
@@ -96,7 +132,7 @@ def test_regenerated_output_matches_committed(tmp_path):
         assert svg_structure(new) == svg_structure(f), f.name
         for a, b in zip(svg_shapes(new), svg_shapes(f), strict=True):
             assert a.symmetric_difference(b).area < 0.01, f.name
-    assert len(list((tmp_path / "symbolic").iterdir())) == 102
+    assert len(list((tmp_path / "symbolic").iterdir())) == 198
     old = json.loads((data_dir() / "geometry.json").read_text("utf-8"))
     new = json.loads((tmp_path / "geometry.json").read_text("utf-8"))
     assert old.keys() == new.keys() and old["dots"] == new["dots"]
@@ -126,17 +162,28 @@ def svg_shapes(path: Path) -> list:
 def test_names_for_every_spec():
     assert icon_name(IconSpec()) == "repotray-symbolic"
     assert icon_name(IconSpec("attention", "success", "warning")) == (
+        "repotray-up-success-down-warning-symbolic"
+    )
+    assert icon_name(IconSpec("attention", "success", "warning", marker="dot")) == (
         "repotray-top-success-bottom-warning-symbolic"
     )
     assert icon_name(IconSpec("attention", None, None, "error")) == "repotray-tint-error-symbolic"
+    assert icon_name(IconSpec("attention", None, None, "error", marker="dot")) == (
+        "repotray-tint-error-symbolic"
+    )
     assert icon_name(IconSpec("error", "success")) == "repotray-error-symbolic"
     assert icon_name(IconSpec("paused")) == "repotray-paused-symbolic"
     with pytest.raises(ValueError):
         icon_name(IconSpec("attention", "#ff0000"))
 
 
+def test_hex_svg_arrows():
+    text = render_svg(IconSpec("attention", "#00ff00", None))
+    assert '<path d="M12.5 0L16 6 9 6Z" fill="#00ff00"/>' in text and "<circle" not in text
+
+
 def test_hex_svg(tmp_path):
-    spec = IconSpec("attention", "#ff0000", "warning", None, glyph_color="#123456")
+    spec = IconSpec("attention", "#ff0000", "warning", None, glyph_color="#123456", marker="dot")
     text = render_svg(spec)
     assert 'fill="#123456"' in text and 'fill="#ff0000"' in text and 'fill="#f57900"' in text
     assert "class=" not in text
@@ -148,16 +195,24 @@ def test_hex_svg(tmp_path):
 
 def test_geometry_shape():
     g = geometry()
-    assert set(g["glyph"]) == {"none", "top", "bottom", "both"}
+    assert set(g["glyph"]) == {"dot", "arrow"}
+    for shape in ("dot", "arrow"):
+        assert set(g["glyph"][shape]) == {"none", "top", "bottom", "both"}
+    assert g["glyph"]["dot"]["none"] == g["glyph"]["arrow"]["none"]
     assert g["dots"]["bottom"] == [13.0, 13.0, 3.0]
+    assert {tuple(p) for p in g["arrows"]["top"][0][0]} == set(ARROWS["top"])
 
 
 def test_raster():
     pytest.importorskip("PIL")
     from repotray.icons.raster import render
 
-    img = render(IconSpec("attention", "success", "warning"), size=64)
-    assert img.size == (64, 64) and img.mode == "RGBA"
+    arrows = render(IconSpec("attention", "success", "warning"), size=64)
+    assert arrows.size == (64, 64) and arrows.mode == "RGBA"
+    assert arrows.getpixel((50, 16)) == (46, 194, 126, 255)  # inside the ▲ (12.5, 4)
+    assert arrows.getpixel((50, 48)) == (245, 121, 0, 255)  # inside the ▼ (12.5, 12)
+    assert arrows.getpixel((63, 0))[3] == 0  # beside the ▲'s apex: transparent
+    img = render(IconSpec("attention", "success", "warning", marker="dot"), size=64)
     assert img.getpixel((52, 12)) == (46, 194, 126, 255)  # top dot centre
     assert img.getpixel((52, 52)) == (245, 121, 0, 255)  # bottom dot centre
     assert img.getpixel((0, 0))[3] == 0  # transparent corner

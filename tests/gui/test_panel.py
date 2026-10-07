@@ -98,24 +98,31 @@ def test_panel_rows_and_buttons(ui):
     ctl, panel = ui
     v = panel.view
     assert v.left_title.get_text() == "Push (3)" and v.right_title.get_text() == "Pull (3)"
-    assert [name_of(grid_cell(panel, 0, r)) for r in range(3)] == [
-        "design-system",
+    # One repo per row, alphabetical: push side left, pull side right.
+    assert [name_of(grid_cell(panel, 0, r)) for r in range(5)] == [
         "api-gateway",
-        "infra",
-    ]
-    assert [name_of(grid_cell(panel, 6, r)) for r in range(3)] == [
         "design-system",
+        "infra",
+        None,
+        None,
+    ]
+    assert [name_of(grid_cell(panel, 6, r)) for r in range(5)] == [
+        None,
+        "design-system",
+        None,
         "mobile-app",
         "website",
     ]
-    sync = grid_cell(panel, 3, 0)
+    sync = grid_cell(panel, 3, 1)
     assert isinstance(sync, Gtk.Button) and sync.get_sensitive()
-    diverged_push = grid_cell(panel, 2, 0)  # disabled: wrapped in an EventBox for its tooltip
+    diverged_push = grid_cell(panel, 2, 1)  # disabled: wrapped in an EventBox for its tooltip
     assert isinstance(diverged_push, Gtk.EventBox)
     assert diverged_push.get_tooltip_text() == "Diverged — use Sync"
-    push = grid_cell(panel, 2, 1)
+    push = grid_cell(panel, 2, 0)
     assert push.get_sensitive() and push.get_tooltip_text() == "Push 3 commits to origin/main"
-    assert v.sync_all.get_sensitive()
+    labels = [w.label.get_text() for w in (v.push_all, v.sync_all, v.pull_all)]
+    assert labels == ["Push all", "Sync all", "Pull all"]
+    assert all(w.get_sensitive() for w in (v.push_all, v.sync_all, v.pull_all))
     titles = [c for c in v.groups.get_children()]
     assert len(titles) == 4  # uncommitted, no upstream, fetch failed, in sync
 
@@ -132,16 +139,28 @@ def test_push_shows_spinner_then_success_banner(ui):
             panel.view.banner.get_visible() and "Pushed infra" in panel.view.banner_label.get_text()
         ),
     )
-    # infra left the push column
-    names = [name_of(grid_cell(panel, 0, r)) for r in range(3)]
+    # infra has nothing left to do: its row is gone
+    names = [name_of(grid_cell(panel, c, r)) for r in range(5) for c in (0, 6)]
     assert "infra" not in names
+
+
+def test_push_all_runs_every_push(ui):
+    ctl, panel = ui
+    panel.show_at(Anchor(4000, 1400, "bottom"))
+    pump(0.2)
+    panel.view.push_all.clicked()
+    assert pump(1.0, lambda: panel.view.push_all.spinner.get_visible())
+    assert "Pushing" in panel.view.push_all.label.get_text()
+    assert pump(5.0, lambda: "Pushed 2 of 2" in panel.view.banner_label.get_text())
+    assert panel.view.push_all.label.get_text() == "Push all"
+    assert not panel.view.push_all.get_sensitive()  # nothing left to push
 
 
 def test_failed_pull_shows_error_banner_with_details(ui):
     ctl, panel = ui
     panel.show_at(Anchor(4000, 1400, "bottom"))
     pump(0.2)
-    grid_cell(panel, 4, 1).clicked()  # mobile-app pull fails in the demo
+    grid_cell(panel, 4, 3).clicked()  # mobile-app pull fails in the demo
     assert pump(3.0, lambda: "fast-forward" in panel.view.banner_label.get_text())
     assert panel.view.banner.get_message_type() == Gtk.MessageType.ERROR
     assert panel.view.details_btn.get_visible()

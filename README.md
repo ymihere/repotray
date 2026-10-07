@@ -7,7 +7,7 @@ have **local work** (uncommitted changes or commits to push) and how many have *
 other tray icon, with a platform-independent core that other desktops and operating systems plug
 into.
 
-![Tray icon with a green "push" dot, an orange "pull" dot and the label ↑3 ↓3](docs/images/tray.png)
+![Tray icon with a green ▲ (something to push), an orange ▼ (something to pull) and the label ↑3 ↓3](docs/images/tray.png)
 
 ![The panel: pushable repos on the left, pullable on the right, buttons meeting in the middle](docs/images/panel-dark.png)
 
@@ -16,13 +16,15 @@ into.
 ## Features
 
 - **Counts at a glance.** The label next to the icon shows `↑3 ↓1` (repos to push / to pull).
-  A green dot in the top-right corner means something to push, an orange dot in the bottom-right
-  corner (the spot and colour of Mint's "updates available") means something to pull.
+  A green ▲ in the top-right corner means something to push, an orange ▼ in the bottom-right
+  corner (the spot and colour of Mint's "updates available") means something to pull. Prefer
+  Mint-style dots? Set `marker = "dot"`.
 - **Native look on Cinnamon.** The icon is a monochrome *symbolic* SVG that the panel recolours
   like its neighbours; dots use the theme's success/warning colours.
-- **Panel.** Left click opens a popup: pushable repos left, pullable right, a *Sync* button for
-  diverged branches in the middle, *Sync all* in the footer, groups for uncommitted, no-upstream,
-  detached and failed repos.
+- **Panel.** Left click opens a popup with one row per repository: its push button on the left,
+  its pull button on the right, a *Sync* button in the middle when the branch diverged.
+  *Push all*, *Sync all* and *Pull all* at the top; groups for uncommitted, no-upstream, detached
+  and failed repos below.
 - **Safe by design.** Never `--force`, never prompts for credentials, aborts a conflicting rebase
   so the repository is left exactly as it was, and status checks never write to your repos.
 - **Headless CLI.** `repotray status`, `scan`, `fetch`, `push`, `pull`, `sync` work without a GUI.
@@ -67,7 +69,9 @@ In the panel, each repository row has a button: **Push** (`git push` to its upst
 (`git pull --ff-only`) or, for a branch that has diverged, **Sync** (`git pull --rebase`, then
 `git push`; `sync_strategy = "merge"` merges instead). Sync refuses to run while the repository
 has uncommitted tracked changes, and if the rebase hits conflicts it is aborted and the repository
-is left as it was. **Sync all** does the right thing for every row. Click a repository name for
+is left as it was. **Push all** pushes every repository that is only ahead, **Pull all** pulls
+every one that is only behind, and **Sync all** does both and also syncs the diverged ones. Rows
+are sorted by name; `panel_sort = "state"` puts syncable, then pushable, then pullable first. Click a repository name for
 *Open terminal here*, *Open folder*, *Copy path* and *Fetch now*.
 
 repotray fetches every 10 minutes (and after resume from suspend), checks local status every
@@ -84,8 +88,11 @@ ignore = ["~/work/archive/*"]
 fetch_interval = 600
 sync_strategy = "rebase"          # or "merge"
 
+panel_sort = "name"               # or "state": syncable, pushable, pullable first
+
 [indicator]
 label = ["push", "pull"]          # add "dirty" for ✎N
+marker = "arrow"                  # ▲ push / ▼ pull; "dot" for Mint-style dots
 top_dot = ["push"]
 bottom_dot = ["pull"]
 ```
@@ -99,8 +106,8 @@ repotray [tray] [--demo]           start the tray (default)
 repotray status [--json] [--demo]  one status pass, print a table or JSON
 repotray scan [--absolute]         list discovered repositories
 repotray fetch [REPO...]           fetch, then print status
-repotray push REPO...              git push the current branch to its upstream
-repotray pull REPO...              git pull --ff-only
+repotray push [--all | REPO...]    git push to the upstream; --all = Push all
+repotray pull [--all | REPO...]    git pull --ff-only; --all = Pull all
 repotray sync [--all | REPO...]    push, pull or rebase+push as each repo needs
 repotray doctor                    environment, config, backends and icons report
 repotray config path|default

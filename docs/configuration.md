@@ -64,20 +64,24 @@ that disappear are dropped silently at the next rescan.
 | Key | Type | Default | Notes |
 |---|---|---|---|
 | `backend` | string | `"auto"` | `auto`, `xapp`, `appindicator`, `gtkstatusicon`, `pystray`, `fake` or a plugin's name. `--backend` and `$REPOTRAY_BACKEND` override it. |
+| `panel_sort` | `name` \| `state` | `"name"` | Order of the panel's rows: alphabetical, or syncable (diverged) first, then pushable, then pullable — each group alphabetical. |
 | `panel_theme` | `auto` \| `dark` \| `light` \| `system` | `"auto"` | `auto` follows the Cinnamon panel theme (dark if its name contains "dark"), so the panel matches Cinnamon's own popups even when the GTK theme is light. `system` leaves GTK alone. |
 | `log_level` | `debug` \| `info` \| `warning` | `"info"` | Log file: `~/.local/state/repotray/repotray.log`. |
 
 ## `[indicator]` — what the tray icon signals
 
-Three signals, each with its own trigger set drawn from `push` (≥ 1 repo to push), `pull`
-(≥ 1 repo behind) and `dirty` (≥ 1 repo with uncommitted changes):
+Three signals — a marker in the top-right corner, one in the bottom-right corner, and a tint of
+the whole glyph — each with its own trigger set drawn from `push` (≥ 1 repo to push), `pull`
+(≥ 1 repo behind) and `dirty` (≥ 1 repo with uncommitted changes). By default the markers are
+arrows: a ▲ top-right for something to push, a ▼ bottom-right for something to pull.
 
 | Key | Type | Default | Notes |
 |---|---|---|---|
 | `label` | list ⊆ {push, pull, dirty} | `["push", "pull"]` | Text next to the icon: `↑N` repos to push, `↓N` to pull, `✎N` dirty; in this order; zero parts omitted; `[]` = no label. |
-| `top_dot` | list ⊆ {push, pull, dirty} | `["push"]` | A dot in the top-right corner. `[]` = never. |
+| `marker` | `arrow` \| `dot` | `"arrow"` | Shape of the corner markers: ▲ top-right / ▼ bottom-right, or round dots exactly like Mint's update icon. |
+| `top_dot` | list ⊆ {push, pull, dirty} | `["push"]` | The top-right marker (▲ or dot). `[]` = never. (The key keeps its name for both shapes.) |
 | `top_dot_color` | colour | `"success"` | `foreground`, `warning`, `error`, `success` or `"#rrggbb"`. |
-| `bottom_dot` | list ⊆ {push, pull, dirty} | `["pull"]` | A dot in the bottom-right corner — where Mint's update icon puts its dot. |
+| `bottom_dot` | list ⊆ {push, pull, dirty} | `["pull"]` | The bottom-right marker (▼ or dot) — where Mint's update icon puts its dot. |
 | `bottom_dot_color` | colour | `"warning"` | `warning` is the colour of "updates available". |
 | `tint` | list ⊆ {push, pull, dirty} | `[]` | Recolour the whole glyph. |
 | `tint_color` | colour | `"warning"` | `warning`, `error`, `success` or `"#rrggbb"`. |
@@ -94,12 +98,13 @@ failed, probably offline, or git is missing) and **paused** (two bars: fetching 
 
 ### Recipes
 
-*Default* — green dot when you have commits to push, orange dot when someone else pushed, both
+*Default* — a green ▲ when you have commits to push, an orange ▼ when someone else pushed, both
 when both:
 
 ```toml
 [indicator]
 label = ["push", "pull"]
+marker = "arrow"
 top_dot = ["push"]
 bottom_dot = ["pull"]
 ```
@@ -109,6 +114,7 @@ indistinguishable in style from the update icon next to it:
 
 ```toml
 [indicator]
+marker = "dot"
 top_dot = []
 bottom_dot = ["push", "pull", "dirty"]
 ```

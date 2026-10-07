@@ -211,12 +211,27 @@ def test_sync_all(setup):
     sched.startup()
     sched.sync_all()
     assert sched.wait_idle()
-    assert any(s.sync_all == (0, 2) for s in snaps)
+    assert any(s.bulk == (ActionKind.SYNC, 0, 2) for s in snaps)
     snap = sched.snapshot()
-    assert snap.sync_all is None
+    assert snap.bulk is None
     assert snap.recent_results[0].name == "Sync all"
     assert snap.recent_results[0].message == "Synced 2 of 2"
-    assert any(s.sync_all == (1, 2) for s in snaps)
+    assert any(s.bulk == (ActionKind.SYNC, 1, 2) for s in snaps)
+
+
+def test_push_all_and_pull_all(setup):
+    sched, clock, git, snaps, _ = setup
+    git.ahead.update(alpha=2)
+    sched.startup()
+    sched.pull_all()
+    assert sched.wait_idle()
+    assert sched.snapshot().recent_results[0].message == "Nothing to pull"
+    sched.push_all()
+    assert sched.wait_idle()
+    res = sched.snapshot().recent_results[0]
+    assert res.name == "Push all" and res.message == "Pushed 1 of 1"
+    assert any(s.bulk == (ActionKind.PUSH, 0, 1) for s in snaps)
+    assert sched.snapshot().repos[0].ahead == 0
 
 
 def test_config_reload_triggers_rescan(setup, tmp_path):

@@ -17,6 +17,7 @@ from pathlib import Path
 
 from repotray import __version__
 from repotray.core import config as cfgmod
+from repotray.core.actions import BULK_NAMES
 from repotray.core.indicator import icon_spec, label_text
 from repotray.core.model import (
     UiState,
@@ -33,6 +34,7 @@ log = logging.getLogger("repotray")
 
 PROJECT_URL = "https://github.com/ymihere/repotray"
 NOTIFY_RATE = 3600.0
+ICON_RELOAD_DELAY = 6.0
 
 
 def about_info() -> dict[str, str]:
@@ -145,8 +147,8 @@ class Controller:
                 self.notify(f"Fetch failed: {s.name}", s.fetch_error)
 
     def _on_result(self, res: ActionResult) -> None:
-        # Individual results of a running Sync all are summarised by its final result.
-        if res.name != "Sync all" and getattr(self.scheduler, "sync_all_progress", None):
+        # Individual results of a running Push/Pull/Sync all are summarised by its final result.
+        if res.name not in BULK_NAMES.values() and getattr(self.scheduler, "bulk_progress", None):
             return
         self.backend.call_soon(lambda: self._report(res))
 
@@ -154,7 +156,7 @@ class Controller:
         if self.panel_visible and self.backend.caps["panel"]:
             return  # the panel shows it (banner + row marker)
         title = ("✓ " if res.ok else "⚠ ") + result_text(res)
-        body = "" if res.ok or res.name == "Sync all" else "Open the panel for details"
+        body = "" if res.ok or res.name in BULK_NAMES.values() else "Open the panel for details"
         self.notify(title, body)
 
     def notify(self, title: str, body: str) -> None:
@@ -178,6 +180,8 @@ class Controller:
             "about": lambda: self.about(),
             "quit": lambda: self.quit(),
             "sync_all": lambda: self.sync_all(),
+            "push_all": lambda: self.push_all(),
+            "pull_all": lambda: self.pull_all(),
             "ack_banner": lambda: self.acknowledge_banner(),
             "open_panel": lambda: getattr(self.backend, "open_panel", lambda: None)(),
             "push": lambda: self.push(path),
@@ -218,6 +222,12 @@ class Controller:
 
     def sync_all(self) -> None:
         self.scheduler.sync_all()
+
+    def push_all(self) -> None:
+        self.scheduler.push_all()
+
+    def pull_all(self) -> None:
+        self.scheduler.pull_all()
 
     def set_paused(self, paused: bool) -> None:
         self.scheduler.pause_fetching(paused)
@@ -351,8 +361,9 @@ def run_tray(
             a.thread,
             exc_info=(a.exc_type, a.exc_value, a.exc_traceback),
         )
+        copied: list = []
         try:
-            platform.install_icons(symbolic_dir())
+            copied = platform.install_icons(symbolic_dir())
         except OSError as exc:
             log.warning("installing icons failed: %s", exc)
         try:
@@ -383,6 +394,13 @@ def run_tray(
             for sig in (signal.SIGINT, signal.SIGTERM):
                 signal.signal(sig, lambda *_: be.call_soon(controller.quit))
         controller.render()
+        reload_icon = getattr(be, "reload_icon", None)
+        if copied and reload_icon:
+            # The panel may look up a just-installed icon before its icon theme has rescanned
+            # (GTK rescans at most every few seconds) and show nothing; set it again later.
+            timer = threading.Timer(ICON_RELOAD_DELAY, lambda: be.call_soon(reload_icon))
+            timer.daemon = True
+            timer.start()
         scheduler.start()
         be.run()
         scheduler.stop()

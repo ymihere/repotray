@@ -50,6 +50,7 @@ class IconSpec:
     bottom: str | None = None
     tint: str | None = None
     glyph_color: str = "#e1e1e1"
+    marker: str = "arrow"  # corner marker shape: arrow (▲/▼) or dot
 
     @property
     def hex_mode(self) -> bool:
@@ -63,16 +64,16 @@ def _triggered(triggers: tuple[str, ...], c: Counts) -> bool:
 def icon_spec(snapshot: Snapshot, config: Config) -> IconSpec:
     ind: IndicatorConfig = config.indicator
     if snapshot.git_missing or snapshot.all_fetches_failed:
-        return IconSpec(state="error", glyph_color=ind.glyph_color)
+        return IconSpec(state="error", glyph_color=ind.glyph_color, marker=ind.marker)
     if snapshot.fetch_mode is FetchMode.PAUSED:
-        return IconSpec(state="paused", glyph_color=ind.glyph_color)
+        return IconSpec(state="paused", glyph_color=ind.glyph_color, marker=ind.marker)
     c = counts(snapshot, config)
     top = ind.top_dot_color if _triggered(ind.top_dot, c) else None
     bottom = ind.bottom_dot_color if _triggered(ind.bottom_dot, c) else None
     tint = ind.tint_color if _triggered(ind.tint, c) else None
     if top or bottom or tint:
-        return IconSpec("attention", top, bottom, tint, ind.glyph_color)
-    return IconSpec(state="clean", glyph_color=ind.glyph_color)
+        return IconSpec("attention", top, bottom, tint, ind.glyph_color, ind.marker)
+    return IconSpec(state="clean", glyph_color=ind.glyph_color, marker=ind.marker)
 
 
 def label_text(snapshot: Snapshot, config: Config) -> str:

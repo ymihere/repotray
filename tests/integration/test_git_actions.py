@@ -406,6 +406,24 @@ def test_cli_sync_all_and_fetch(cli_setup):
     cli("fetch", "mine", config=cfg, check_code=1)
 
 
+def test_cli_push_all_and_pull_all(remote_fixture, tmp_path):
+    a = remote_fixture.clone("a")
+    b = remote_fixture.clone("b")
+    commit(a, "a.txt")
+    cfg = tmp_path / "c.toml"
+    cfg.write_text(f"roots = ['{remote_fixture.root}']\n")
+    cli("push", "--all", "a", config=cfg, check_code=2)
+    cp = cli("pull", "--all", config=cfg, check_code=0)
+    assert "Nothing to pull" in cp.stdout
+    cli("push", "--all", config=cfg, check_code=0)
+    assert status(a).ahead == 0
+    git(b, "fetch", "-q")
+    assert status(b).behind == 1
+    cp = cli("pull", "--all", config=cfg, check_code=0)
+    assert "Pulled 1 commit" in cp.stdout
+    assert status(b).behind == 0
+
+
 def test_cli_ambiguous_name(remote_fixture, tmp_path):
     (remote_fixture.root / "a").mkdir()
     (remote_fixture.root / "b").mkdir()

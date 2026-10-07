@@ -5,7 +5,8 @@ The corner-dot knockouts are baked into the glyph path (boolean difference), nev
 or clip paths: GTK's symbolic loader recolours every element, which would recolour a mask too.
 
 Outputs, in ``--out`` (default: src/repotray/icons/data):
-  symbolic/repotray[-tint-<t>][-top-<c>][-bottom-<c>]-symbolic.svg   100 files
+  symbolic/repotray[-tint-<t>][-top-<c>][-bottom-<c>]-symbolic.svg   100 files (dots)
+  symbolic/repotray[-tint-<t>][-up-<c>][-down-<c>]-symbolic.svg       96 files (arrows)
   symbolic/repotray-error-symbolic.svg, symbolic/repotray-paused-symbolic.svg
   geometry.json        rings for full-colour (hex) SVGs and Pillow rasters
   LICENSE-octicons     the upstream MIT notice
@@ -43,9 +44,17 @@ FLATTEN = 0.05  # max segment length when flattening curves
 SIMPLIFY = 0.01
 DIGITS = 3
 
+# Corner markers. "dot": Mint's update-icon geometry (r=3, knocked out at r=4).
+# "arrow": a triangle pointing up (top-right) or down (bottom-right), knocked out by ARROW_GAP.
 DOT_R = 3.0
 KNOCKOUT_R = 4.0
 DOTS = {"top": (13.0, 3.0), "bottom": (13.0, 13.0)}
+ARROWS = {
+    "top": ((12.5, 0.0), (16.0, 6.0), (9.0, 6.0)),  # 7 wide, 6 high: legible at 16 px
+    "bottom": ((9.0, 10.0), (16.0, 10.0), (12.5, 16.0)),
+}
+ARROW_GAP = 1.0
+SHAPES = ("dot", "arrow")
 
 FALLBACK = {
     "foreground": "#bebebe",
@@ -93,9 +102,15 @@ def _multi(g) -> MultiPolygon:
     return MultiPolygon([p for p in getattr(g, "geoms", []) if isinstance(p, Polygon)])
 
 
-def knockout(shape, corners: tuple[str, ...]) -> MultiPolygon:
+def marker_cutout(shape_kind: str, corner: str):
+    if shape_kind == "dot":
+        return Point(*DOTS[corner]).buffer(KNOCKOUT_R, quad_segs=32)
+    return Polygon(ARROWS[corner]).buffer(ARROW_GAP, quad_segs=16)
+
+
+def knockout(shape, corners: tuple[str, ...], shape_kind: str = "dot") -> MultiPolygon:
     for c in corners:
-        shape = shape.difference(Point(*DOTS[c]).buffer(KNOCKOUT_R, quad_segs=32))
+        shape = shape.difference(marker_cutout(shape_kind, c))
     return _multi(shape.simplify(SIMPLIFY, preserve_topology=True))
 
 
@@ -154,32 +169,36 @@ def glyph_el(d: str, tint: str | None) -> str:
     return f'<path d="{d}" fill-rule="evenodd" {fill_attrs(tint)}/>'
 
 
-def dot_el(corner: str, color: str) -> str:
-    cx, cy = DOTS[corner]
-    return f'<circle cx="{cx:g}" cy="{cy:g}" r="{DOT_R:g}" {fill_attrs(color)}/>'
+def marker_el(shape_kind: str, corner: str, color: str) -> str:
+    if shape_kind == "dot":
+        cx, cy = DOTS[corner]
+        return f'<circle cx="{cx:g}" cy="{cy:g}" r="{DOT_R:g}" {fill_attrs(color)}/>'
+    return f'<path d="{path_d(rings(_multi(Polygon(ARROWS[corner]))))}" {fill_attrs(color)}/>'
 
 
-def icon_name(tint: str | None, top: str | None, bottom: str | None) -> str:
+CORNER_WORDS = {"dot": ("top", "bottom"), "arrow": ("up", "down")}
+
+
+def icon_name(tint: str | None, top: str | None, bottom: str | None, shape: str = "dot") -> str:
+    """Dots: -top-/-bottom-; arrows: -up-/-down-. Mirrors repotray.icons.names."""
+    up, down = CORNER_WORDS[shape]
     name = "repotray"
     if tint:
         name += f"-tint-{tint}"
     if top:
-        name += f"-top-{top}"
+        name += f"-{up}-{top}"
     if bottom:
-        name += f"-bottom-{bottom}"
+        name += f"-{down}-{bottom}"
     return name + "-symbolic"
 
 
 def build(out: Path) -> list[Path]:
     base = glyph_shape()
-    variants = {
-        "none": knockout(base, ()),
-        "top": knockout(base, ("top",)),
-        "bottom": knockout(base, ("bottom",)),
-        "both": knockout(base, ("top", "bottom")),
+    corners = {"none": (), "top": ("top",), "bottom": ("bottom",), "both": ("top", "bottom")}
+    vrings = {
+        kind: {k: rings(knockout(base, c, kind)) for k, c in corners.items()} for kind in SHAPES
     }
-    vrings = {k: rings(v) for k, v in variants.items()}
-    d = {k: path_d(r) for k, r in vrings.items()}
+    d = {kind: {k: path_d(r) for k, r in v.items()} for kind, v in vrings.items()}
     cross, bars = rings(cross_shape()), rings(bars_shape())
 
     sym = out / "symbolic"
@@ -188,27 +207,34 @@ def build(out: Path) -> list[Path]:
     sym.mkdir(parents=True)
     written: list[Path] = []
 
-    for tint, top, bottom in product(TINTS, DOT_COLORS, DOT_COLORS):
+    for kind, tint, top, bottom in product(SHAPES, TINTS, DOT_COLORS, DOT_COLORS):
+        if kind != "dot" and not (top or bottom):
+            continue  # marker-less icons are shared by both shapes
         key = {(False, False): "none", (True, False): "top", (False, True): "bottom"}.get(
             (bool(top), bool(bottom)), "both"
         )
-        els = [glyph_el(d[key], tint)]
+        els = [glyph_el(d[kind][key], tint)]
         if top:
-            els.append(dot_el("top", top))
+            els.append(marker_el(kind, "top", top))
         if bottom:
-            els.append(dot_el("bottom", bottom))
-        f = sym / f"{icon_name(tint, top, bottom)}.svg"
+            els.append(marker_el(kind, "bottom", bottom))
+        f = sym / f"{icon_name(tint, top, bottom, kind)}.svg"
         f.write_text(svg(els))
         written.append(f)
 
     f = sym / "repotray-error-symbolic.svg"
     f.write_text(
-        svg([glyph_el(d["bottom"], None), f'<path d="{path_d(cross)}" {fill_attrs("error")}/>'])
+        svg(
+            [
+                glyph_el(d["dot"]["bottom"], None),
+                f'<path d="{path_d(cross)}" {fill_attrs("error")}/>',
+            ]
+        )
     )
     written.append(f)
     f = sym / "repotray-paused-symbolic.svg"
     f.write_text(
-        svg([glyph_el(d["bottom"], None), f'<path d="{path_d(bars)}" {fill_attrs(None)}/>'])
+        svg([glyph_el(d["dot"]["bottom"], None), f'<path d="{path_d(bars)}" {fill_attrs(None)}/>'])
     )
     written.append(f)
 
@@ -216,6 +242,7 @@ def build(out: Path) -> list[Path]:
         "viewbox": 16,
         "glyph": vrings,
         "dots": {k: [*v, DOT_R] for k, v in DOTS.items()},
+        "arrows": {k: rings(_multi(Polygon(v))) for k, v in ARROWS.items()},
         "knockout_radius": KNOCKOUT_R,
         "cross": cross,
         "bars": bars,

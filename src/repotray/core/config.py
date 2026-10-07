@@ -13,6 +13,7 @@ from typing import Any
 TRIGGERS = ("push", "pull", "dirty")
 SYMBOLIC_COLORS = ("foreground", "warning", "error", "success")
 TINT_COLORS = ("warning", "error", "success")
+MARKERS = ("arrow", "dot")
 HEX_RE = re.compile(r"#[0-9a-fA-F]{6}")
 
 DEFAULT_EXCLUDE_DIRS = (
@@ -39,6 +40,7 @@ class IndicatorConfig:
     tint: tuple[str, ...] = ()
     tint_color: str = "warning"
     glyph_color: str = "#e1e1e1"
+    marker: str = "arrow"
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,6 +72,7 @@ class Config:
     file_manager: str = ""
     backend: str = "auto"
     panel_theme: str = "auto"
+    panel_sort: str = "name"
     log_level: str = "info"
     indicator: IndicatorConfig = field(default_factory=IndicatorConfig)
     repo: dict[str, RepoOverride] = field(default_factory=dict)
@@ -124,6 +127,7 @@ _STR_CHOICES: dict[str, tuple[str, ...] | None] = {
     "file_manager": None,
     "backend": None,
     "panel_theme": ("auto", "dark", "light", "system"),
+    "panel_sort": ("name", "state"),
     "log_level": ("debug", "info", "warning"),
 }
 _STR_LISTS = ("roots", "repos", "ignore", "exclude_dirs")
@@ -225,6 +229,11 @@ def _indicator(v: Any) -> tuple[IndicatorConfig, list[str]]:
                     "'indicator.tint_color' must be warning, error, success or #rrggbb; "
                     f"using '{d.tint_color}'"
                 )
+                continue
+            vals[key] = x
+        elif key == "marker":
+            if x not in MARKERS:
+                warnings.append(f"'indicator.marker' must be arrow or dot; using '{d.marker}'")
                 continue
             vals[key] = x
         elif key == "glyph_color":

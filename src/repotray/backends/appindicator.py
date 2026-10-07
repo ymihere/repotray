@@ -67,6 +67,11 @@ class AppIndicatorBackend(GtkBackendBase):
         else:
             self.indicator.set_icon_full(ref, "repotray")
 
+    def reload_icon(self) -> None:
+        if self._icon_name and not self._theme_path:
+            self.indicator.set_icon_full("image-missing", "repotray")
+            self.indicator.set_icon_full(self._icon_name, "repotray")
+
     def set_label(self, text: str) -> None:
         if text != self._label:
             self._label = text

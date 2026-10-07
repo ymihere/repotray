@@ -9,8 +9,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from repotray.core.actions import (
+    BULK_NAMES,
     block_reason,
-    plan_sync_all,
+    plan_bulk,
     plural,
     pull_block_reason,
     push_block_reason,
@@ -101,9 +102,21 @@ class Header:
 
 
 @dataclass(frozen=True, slots=True)
-class Footer:
-    sync_all: Button
-    label: str
+class BulkButton:
+    action: ActionKind  # PUSH = Push all, PULL = Pull all, SYNC = Sync all
+    label: str  # "Push all" / "Pushing 2/5…"
+    enabled: bool
+    busy: bool
+    tooltip: str
+
+
+@dataclass(frozen=True, slots=True)
+class BulkBar:
+    """Push all · Sync all · Pull all, at the top of the panel."""
+
+    push: BulkButton
+    sync: BulkButton
+    pull: BulkButton
 
 
 @dataclass(frozen=True, slots=True)
@@ -121,7 +134,7 @@ class PanelModel:
     rows: tuple[Row, ...]
     empty_text: str | None
     groups: tuple[Group, ...]
-    footer: Footer
+    bulk: BulkBar
     banner: Banner | None
 
 
@@ -314,26 +327,31 @@ def _key(s: RepoState) -> tuple[str, str]:
     return (s.name.casefold(), str(s.path))
 
 
+def _state_rank(s: RepoState) -> int:
+    return 0 if s.diverged else (1 if s.pushable else 2)
+
+
 def build_rows(snapshot: Snapshot, config: Config) -> tuple[Row, ...]:
-    repos = sorted(snapshot.repos, key=_key)
-    rows: list[Row] = []
-    for s in repos:
-        if s.diverged:
-            rows.append(
-                Row(
-                    left=_cell(s, snapshot, config, "left"),
-                    sync=sync_button(s, snapshot, config),
-                    right=_cell(s, snapshot, config, "right"),
-                    sync_path=s.path,
-                )
-            )
-    push = [s for s in repos if s.pushable and not s.diverged]
-    pull = [s for s in repos if s.pullable and not s.diverged]
-    for i in range(max(len(push), len(pull))):
-        left = _cell(push[i], snapshot, config, "left") if i < len(push) else None
-        right = _cell(pull[i], snapshot, config, "right") if i < len(pull) else None
-        rows.append(Row(left=left, sync=None, right=right))
-    return tuple(rows)
+    """One row per repo with something to push or pull: its push cell on the left, its pull
+    cell on the right, and a Sync button in the middle when it diverged.
+
+    Sorted by name, or with ``panel_sort = "state"`` syncable first, then pushable, then pullable
+    (each by name).
+    """
+    repos = [s for s in snapshot.repos if s.pushable or s.pullable]
+    if config.panel_sort == "state":
+        repos.sort(key=lambda s: (_state_rank(s), *_key(s)))
+    else:
+        repos.sort(key=_key)
+    return tuple(
+        Row(
+            left=_cell(s, snapshot, config, "left") if s.pushable else None,
+            sync=sync_button(s, snapshot, config) if s.diverged else None,
+            right=_cell(s, snapshot, config, "right") if s.pullable else None,
+            sync_path=s.path if s.diverged else None,
+        )
+        for s in repos
+    )
 
 
 def build_groups(snapshot: Snapshot, config: Config) -> tuple[Group, ...]:
@@ -420,7 +438,7 @@ def result_end(r: ActionResult) -> float:
 
 
 def result_text(r: ActionResult) -> str:
-    if r.name == "Sync all":
+    if r.name in BULK_NAMES.values():
         return r.message
     if r.ok:
         return f"{_DONE_VERB[r.action]} {r.name}"
@@ -439,33 +457,45 @@ def build_banner(snapshot: Snapshot, now: float, ack: float) -> Banner | None:
     return None
 
 
-def build_footer(snapshot: Snapshot) -> Footer:
-    if snapshot.sync_all is not None:
-        done, total = snapshot.sync_all
-        return Footer(
-            Button(ActionKind.SYNC, False, True, "Sync all is running"),
-            f"Syncing {done}/{total}…",
-        )
-    plan = plan_sync_all(s for s in snapshot.repos if s.path not in snapshot.running)
-    if not plan.jobs:
-        tip = "Nothing to push or pull"
-        if plan.skipped:
-            tip += f" ({len(plan.skipped)} skipped: {plan.skipped[0][1].lower()})"
-        return Footer(Button(ActionKind.SYNC, False, False, tip), "Sync all")
-    kinds = [k for k, _ in plan.jobs]
-    bits = []
-    for k, word in (
-        (ActionKind.PUSH, "push"),
-        (ActionKind.PULL, "pull"),
-        (ActionKind.SYNC, "sync"),
-    ):
-        n = kinds.count(k)
-        if n:
-            bits.append(f"{word} {n}")
-    tip = "Sync all: " + ", ".join(bits)
+_BULK_ING = {ActionKind.PUSH: "Pushing", ActionKind.PULL: "Pulling", ActionKind.SYNC: "Syncing"}
+
+
+def _bulk_button(kind: ActionKind, snapshot: Snapshot) -> BulkButton:
+    name = BULK_NAMES[kind]
+    if snapshot.bulk is not None:
+        running, done, total = snapshot.bulk
+        if running is kind:
+            return BulkButton(kind, f"{_BULK_ING[kind]} {done}/{total}…", False, True, f"{name}…")
+        return BulkButton(kind, name, False, False, f"Busy: {BULK_NAMES[running]} is running")
+    plan = plan_bulk(kind, (s for s in snapshot.repos if s.path not in snapshot.running))
+    skipped = ""
     if plan.skipped:
-        tip += f"; skips {', '.join(n for n, _ in plan.skipped)} ({plan.skipped[0][1].lower()})"
-    return Footer(Button(ActionKind.SYNC, True, False, tip), "Sync all")
+        names = ", ".join(n for n, _ in plan.skipped)
+        skipped = f"; skips {names} ({plan.skipped[0][1].lower()})"
+    if not plan.jobs:
+        what = "push or pull" if kind is ActionKind.SYNC else kind.value
+        return BulkButton(kind, name, False, False, f"Nothing to {what}{skipped}")
+    if kind is ActionKind.SYNC:
+        kinds = [k for k, _ in plan.jobs]
+        bits = [
+            f"{word} {kinds.count(k)}"
+            for k, word in ((ActionKind.PUSH, "push"), (ActionKind.PULL, "pull"),
+                            (ActionKind.SYNC, "sync"))
+            if kinds.count(k)
+        ]  # fmt: skip
+        tip = "Sync all: " + ", ".join(bits)
+    else:
+        repos = ", ".join(i.name for _, i in plan.jobs)
+        tip = f"{kind.value.capitalize()} {plural(len(plan.jobs), 'repo')}: {repos}"
+    return BulkButton(kind, name, True, False, tip + skipped)
+
+
+def build_bulk(snapshot: Snapshot) -> BulkBar:
+    return BulkBar(
+        push=_bulk_button(ActionKind.PUSH, snapshot),
+        sync=_bulk_button(ActionKind.SYNC, snapshot),
+        pull=_bulk_button(ActionKind.PULL, snapshot),
+    )
 
 
 def panel_model(
@@ -490,7 +520,7 @@ def panel_model(
         rows=rows,
         empty_text=None if rows else "Nothing to push or pull",
         groups=build_groups(snapshot, config),
-        footer=build_footer(snapshot),
+        bulk=build_bulk(snapshot),
         banner=build_banner(snapshot, now, ui.banner_ack),
     )
 
@@ -575,16 +605,10 @@ def fallback_menu(
                 for ch in g.chips
             )
             items.append(MenuItem(g.title, None, children=children))
-    footer = build_footer(snapshot)
+    bulk = build_bulk(snapshot)
     items.append(MenuItem.sep())
-    items.append(
-        MenuItem(
-            footer.label,
-            "sync_all",
-            enabled=footer.sync_all.enabled,
-            tooltip=footer.sync_all.tooltip,
-        )
-    )
+    for b, action in ((bulk.push, "push_all"), (bulk.pull, "pull_all"), (bulk.sync, "sync_all")):
+        items.append(MenuItem(b.label, action, enabled=b.enabled, tooltip=b.tooltip))
     items.append(MenuItem.sep())
     items += control_menu(snapshot, ui)
     return tuple(items)
@@ -592,10 +616,11 @@ def fallback_menu(
 
 __all__ = [
     "Banner",
+    "BulkBar",
+    "BulkButton",
     "Button",
     "Cell",
     "Chip",
-    "Footer",
     "Group",
     "Header",
     "MenuItem",

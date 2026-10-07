@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from repotray.core.indicator import IconSpec
 from repotray.icons import geometry
-from repotray.icons.svg import resolve, variant
+from repotray.icons.svg import glyph_rings, resolve
 
 SUPERSAMPLE = 4
 
@@ -53,19 +53,23 @@ def render(spec: IconSpec, size: int = 64, glyph_color: str | None = None):
         layer = Image.new("RGBA", (px, px), (*_rgb(color), 255))
         img.paste(layer, (0, 0), mask)
 
-    paint(_mask(g["glyph"][variant(spec)], px, scale), resolve(spec.tint, fg))
+    paint(_mask(glyph_rings(spec), px, scale), resolve(spec.tint, fg))
     if spec.state == "error":
         paint(_mask(g["cross"], px, scale), resolve("error", fg))
     elif spec.state == "paused":
         paint(_mask(g["bars"], px, scale), fg)
     else:
         for corner, color in (("top", spec.top), ("bottom", spec.bottom)):
-            if color:
+            if not color:
+                continue
+            if spec.marker == "arrow":
+                mask = _mask(g["arrows"][corner], px, scale)
+            else:
                 cx, cy, r = g["dots"][corner]
                 mask = Image.new("L", (px, px), 0)
                 ImageDraw.Draw(mask).ellipse(
                     [(cx - r) * scale, (cy - r) * scale, (cx + r) * scale, (cy + r) * scale],
                     fill=255,
                 )
-                paint(mask, resolve(color, fg))
+            paint(mask, resolve(color, fg))
     return img.resize((size, size), Image.LANCZOS)

@@ -118,6 +118,6 @@ class Snapshot:
     all_fetches_failed: bool = False
     git_missing: bool = False
     running: Mapping[Path, ActionKind] = field(default_factory=dict)
-    sync_all: tuple[int, int] | None = None
+    bulk: tuple[ActionKind, int, int] | None = None  # (kind, done, total) of a running "… all"
     recent_results: tuple[ActionResult, ...] = ()
     config_warning: str | None = None

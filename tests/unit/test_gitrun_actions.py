@@ -7,11 +7,11 @@ import pytest
 
 from repotray.core.actions import (
     ActionContext,
+    BulkPlan,
     RepoLocks,
-    SyncAllPlan,
-    plan_sync_all,
+    plan_bulk,
     run_action,
-    summarize_sync_all,
+    summarize_bulk,
 )
 from repotray.core.gitrun import (
     CallKind,
@@ -85,37 +85,57 @@ def state(name, **kw):
     return RepoState(info=RepoInfo(p, p / ".git", name), **base)
 
 
+BULK_STATES = [
+    state("a", ahead=1),
+    state("b", behind=2),
+    state("c", ahead=1, behind=1),
+    state("d", ahead=1, behind=1, unstaged=1),
+    state("e", ahead=1, behind=1, untracked=1),
+    state("f"),
+    state("g", ahead=1, operation="rebase"),
+    state("h", behind=1, operation="merge"),
+]
+
+
+def jobs(plan):
+    return [(k.value, i.name) for k, i in plan.jobs]
+
+
 def test_plan_sync_all():
-    plan = plan_sync_all(
-        [
-            state("a", ahead=1),
-            state("b", behind=2),
-            state("c", ahead=1, behind=1),
-            state("d", ahead=1, behind=1, unstaged=1),
-            state("e", ahead=1, behind=1, untracked=1),
-            state("f"),
-            state("g", ahead=1, operation="rebase"),
-        ]
+    plan = plan_bulk(ActionKind.SYNC, BULK_STATES)
+    assert jobs(plan) == [("push", "a"), ("pull", "b"), ("sync", "c"), ("sync", "e")]
+    assert plan.skipped == (
+        ("d", "Commit or stash first"),
+        ("g", "Operation in progress: rebase"),
+        ("h", "Operation in progress: merge"),
     )
-    assert [(k.value, i.name) for k, i in plan.jobs] == [
-        ("push", "a"),
-        ("pull", "b"),
-        ("sync", "c"),
-        ("sync", "e"),
-    ]
-    assert plan.skipped == (("d", "Commit or stash first"), ("g", "Operation in progress: rebase"))
+
+
+def test_plan_push_all_and_pull_all():
+    push = plan_bulk(ActionKind.PUSH, BULK_STATES)
+    assert jobs(push) == [("push", "a")]
+    diverged = [n for n, r in push.skipped if r == "Diverged — use Sync"]
+    assert diverged == ["c", "d", "e"]
+    assert ("g", "Operation in progress: rebase") in push.skipped
+    pull = plan_bulk(ActionKind.PULL, BULK_STATES)
+    assert jobs(pull) == [("pull", "b")]
+    assert ("h", "Operation in progress: merge") in pull.skipped
+    assert all(n != "a" for n, _ in pull.skipped)  # push-only repos are simply not pulled
 
 
 def test_summary_text():
-    plan = SyncAllPlan(jobs=(), skipped=(("notes", "Commit or stash first"),))
+    plan = BulkPlan(ActionKind.SYNC, jobs=(), skipped=(("notes", "Commit or stash first"),))
     rs = [
         ActionResult(Path("/a"), ActionKind.PUSH, True, "ok", name="a"),
         ActionResult(Path("/b"), ActionKind.PULL, False, "bad", name="b"),
     ]
-    s = summarize_sync_all(plan, rs, 0, 1)
+    s = summarize_bulk(plan, rs, 0, 1)
     assert s.message == "Synced 1 of 2 · 1 failed · 1 skipped (commit or stash first: notes)"
-    assert not s.ok
-    assert summarize_sync_all(SyncAllPlan((), ()), [], 0, 0).message == "Nothing to sync"
+    assert not s.ok and s.name == "Sync all"
+    assert summarize_bulk(BulkPlan(ActionKind.SYNC, (), ()), [], 0, 0).message == "Nothing to sync"
+    push = summarize_bulk(BulkPlan(ActionKind.PUSH, (), ()), rs[:1], 0, 1)
+    assert push.message == "Pushed 1 of 1" and push.name == "Push all" and push.ok
+    assert summarize_bulk(BulkPlan(ActionKind.PULL, (), ()), [], 0, 0).message == "Nothing to pull"
 
 
 class Recorder:

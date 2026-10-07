@@ -21,16 +21,18 @@ published (the maintainer does that, see RELEASING.md). Installed for the mainta
   through the backend and platform registries (PLAN §4); contributors port without touching the core.
 - On Cinnamon the icon must match the other tray icons: monochrome **symbolic** SVG recoloured by the
   panel. Reference icons by theme name, never pixmaps.
-- Left click opens a **panel** (Gtk 3 window, not a menu): pushable repos left, pullable right, buttons
-  meeting in a middle gutter; diverged repos get a shared row with a *Sync* button; *Sync all* and a gear
-  menu in the footer. Right click = control menu, middle click = fetch all. SPEC §2.5, §4.1.
+- Left click opens a **panel** (Gtk 3 window, not a menu): **one row per repo**, its push cell left,
+  pull cell right, buttons meeting in a middle gutter, *Sync* in the gutter for diverged repos; rows
+  alphabetical (`panel_sort = "state"`: syncable, pushable, pullable). *Push all · Sync all · Pull all*
+  at the top, gear in the header. Right click = control menu, middle click = fetch all. SPEC §2.5, §4.1.
 - Sync = `git pull --rebase` then `git push`; `merge` is the only alternative. Never auto-stash, abort on
   conflicts, so a failed action leaves the repo as it was.
-- Icon signalling is configurable (`[indicator]`): label parts, a top-right dot, a bottom-right dot and a
-  tint, each with its own trigger set and theme colour. Defaults: green top-right = push, orange
-  bottom-right = pull (Mint's "updates available" spot and colour). Dot geometry copies
-  mintupdate-updates-available-symbolic.svg: r=3 at (13,13)/(13,3), glyph knocked out r=4 (baked into the
-  path, no masks).
+- Icon signalling is configurable (`[indicator]`): label parts, a top-right marker, a bottom-right marker
+  and a tint, each with its own trigger set and theme colour. Defaults: green ▲ top-right = push, orange
+  ▼ bottom-right = pull (Mint's "updates available" spot and colour). Markers are arrows by default
+  (`marker = "arrow"`, 7×6 triangles, 1 px knockout); `marker = "dot"` copies
+  mintupdate-updates-available-symbolic.svg: r=3 at (13,13)/(13,3), glyph knocked out r=4. Knockouts are
+  baked into the path, no masks.
 - Glyph: Octicon `repo` (MIT), GitHub-associated without being a trademark. **Not the GitHub logo**, not
   the Octocat silhouette without its circle either (brand.github.com forbids both, checked 2026-10-05).
 - Label counts repos only. Hidden directories are never discovered; a hidden dir can be a root.

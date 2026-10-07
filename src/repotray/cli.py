@@ -18,7 +18,7 @@ from pathlib import Path
 
 from repotray import __version__
 from repotray.core import config as cfgmod
-from repotray.core.actions import ActionContext, RepoLocks, run_action, smart_kind
+from repotray.core.actions import ActionContext, RepoLocks, plan_bulk, run_action, smart_kind
 from repotray.core.gitrun import GitRunner, git_version
 from repotray.core.gitstatus import apply_fetch_result, check_status, fetch_repo
 from repotray.core.indicator import counts
@@ -307,12 +307,27 @@ def _run_actions(args, cfg, runner, jobs: list[tuple[ActionKind, RepoInfo]]) -> 
     return EXIT_OK if all(r.ok for r in results) else EXIT_FAILED
 
 
+def _run_bulk(args, cfg, runner, kind: ActionKind, infos: list[RepoInfo]) -> int:
+    """`push --all` / `pull --all` / `sync --all`: same plan as the panel's buttons."""
+    plan = plan_bulk(kind, status_all(cfg, runner, infos))
+    for name, reason in plan.skipped:
+        print(f"skip {kind.value:5} {name}: {reason}")
+    if not plan.jobs:
+        print(f"Nothing to {'push or pull' if kind is ActionKind.SYNC else kind.value}")
+        return EXIT_OK
+    return _run_actions(args, cfg, runner, list(plan.jobs))
+
+
 def cmd_action(args) -> int:
     kind = ActionKind(args.command)
+    if args.all == bool(args.repos):
+        return _die(f"{kind.value} needs --all or at least one REPO (not both)", EXIT_USAGE)
     cfg = load_config(args)
     require_git()
     runner = make_runner()
     infos = scan_or_explicit(cfg, runner, args.repos)
+    if args.all:
+        return _run_bulk(args, cfg, runner, kind, infos)
     targets, errors = resolve_repos(args.repos, infos)
     for e in errors:
         print(f"repotray: {e}", file=sys.stderr)
@@ -329,25 +344,20 @@ def cmd_sync(args) -> int:
     runner = make_runner()
     infos = scan_or_explicit(cfg, runner, args.repos)
     if args.all:
-        targets = infos
-    else:
-        targets, errors = resolve_repos(args.repos, infos)
-        for e in errors:
-            print(f"repotray: {e}", file=sys.stderr)
-        if errors:
-            return EXIT_USAGE
-    states = status_all(cfg, runner, targets)
+        return _run_bulk(args, cfg, runner, ActionKind.SYNC, infos)
+    targets, errors = resolve_repos(args.repos, infos)
+    for e in errors:
+        print(f"repotray: {e}", file=sys.stderr)
+    if errors:
+        return EXIT_USAGE
     jobs = []
-    for s in states:
+    for s in status_all(cfg, runner, targets):
         kind = smart_kind(s)
         if kind is None:
-            if not args.all:
-                print(f"ok   -     {s.name}: nothing to do")
+            print(f"ok   -     {s.name}: nothing to do")
             continue
         jobs.append((kind, s.info))
     if not jobs:
-        if args.all:
-            print("Nothing to sync")
         return EXIT_OK
     return _run_actions(args, cfg, runner, jobs)
 
@@ -513,9 +523,13 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("repos", nargs="*", metavar="REPO")
     sp.set_defaults(func=cmd_fetch)
 
-    for name, help in (("push", "git push to the upstream"), ("pull", "git pull --ff-only")):
+    for name, help, every in (
+        ("push", "git push to the upstream", "every repo that is only ahead (Push all)"),
+        ("pull", "git pull --ff-only", "every repo that is only behind (Pull all)"),
+    ):
         sp = add(name, help)
-        sp.add_argument("repos", nargs="+", metavar="REPO", help="name, basename or path")
+        sp.add_argument("--all", action="store_true", help=every)
+        sp.add_argument("repos", nargs="*", metavar="REPO", help="name, basename or path")
         sp.set_defaults(func=cmd_action)
 
     sp = add("sync", "push if ahead, pull if behind, pull --rebase + push if diverged")

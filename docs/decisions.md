@@ -89,6 +89,29 @@ Format: date — question → choice (reason).
   without one, Muffin's focus-stealing prevention occasionally kept focus on the panel (1 flaky
   failure in ~10 runs); the test skips only if the WM still refuses.
 
+### After 0.1.0 (maintainer feedback, 2026-10-07)
+
+- Corner markers are ▲ (push, top-right) / ▼ (pull, bottom-right) by default; `[indicator] marker =
+  "dot"` keeps the Mint-style dots. The trigger keys stay `top_dot` / `bottom_dot` (renaming them
+  would break existing configs; their meaning is "top-right / bottom-right marker"). Triangle size:
+  7 wide × 6 high in the corner box, knocked out with a 1 px margin — a 6-wide candidate was compared
+  side by side at 16/24/32 px and read worse at 16 px. Arrow files are named `-up-` / `-down-` so the
+  dot names stay valid. The glyph knockout for error/paused remains the dot shape.
+- Panel: one row per repo (push cell left, pull cell right, sync for diverged), sorted by name;
+  `panel_sort = "state"` sorts syncable → pushable → pullable. Push-only and pull-only repos never
+  share a row any more.
+- Bulk buttons at the top: *Push all* (left, above the push column), *Sync all* (centre, primary),
+  *Pull all* (right). Push all / Pull all skip diverged repos and say so in the tooltip and result.
+  The gear moved to the header; the footer is gone. One bulk action runs at a time; the others are
+  disabled meanwhile. `Snapshot.sync_all` became `Snapshot.bulk = (kind, done, total)`.
+- CLI: `repotray push --all` / `pull --all`; `sync --all` uses the same plan as the panel and prints
+  skipped repos instead of failing on them.
+- After installing new icon files the tray sets its icon again 6 s later: the applet can look up a
+  just-installed name before GTK's icon theme rescans and show a blank icon (seen once live).
+- The maintainer confirmed real mouse clicks work (2026-10-07), and sees the counts next to the
+  icon with the default XApp backend. Only the AppIndicator route on Cinnamon (via
+  `xapp-sn-watcher`) drops the label — re-checked the same day.
+
 ## Blocked / unverified
 - 2026-10-07 — **Live tray screenshots (M2, M3) while the session is locked.** The maintainer's
   screen locked during the run (cinnamon-screensaver active); root-window captures then show only
