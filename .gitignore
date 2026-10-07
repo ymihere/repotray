@@ -1,0 +1,15 @@
+# Private notes about the maintainer machine
+CLAUDE.local.md
+HANDOFF.md
+
+# Python
+.venv/
+__pycache__/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.ruff_cache/
+
+# Scratch
+.tmp*/
