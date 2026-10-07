@@ -9,9 +9,9 @@ click opens a panel with push / pull / sync buttons.
   implementing repotray follows PLAN.md milestone by milestone without needing to ask.
 - **`CLAUDE.local.md`** (gitignored, may be absent) — facts about the maintainer's dev machine.
 
-## Status (2026-10-05)
-Spec and plan complete; no code yet. Git repo created 2026-10-07 (GitHub `ymihere/repotray`,
-private). Next: PLAN.md milestone M0.
+## Status (2026-10-07)
+M0 done (skeleton, pyproject, dev-setup.sh). Next: PLAN.md milestone M1. Implementation choices are
+logged in `docs/decisions.md`.
 
 ## Decisions already made
 - Name: repotray. Licence: MIT. Python ≥ 3.11, zero PyPI runtime dependencies on Linux.
