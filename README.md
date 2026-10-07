@@ -70,7 +70,8 @@ In the panel, each repository row has a button: **Push** (`git push` to its upst
 `git push`; `sync_strategy = "merge"` merges instead). Sync refuses to run while the repository
 has uncommitted tracked changes, and if the rebase hits conflicts it is aborted and the repository
 is left as it was. Before pulling, *Show incoming commits…* in a repository's menu lists the commit
-messages a pull would bring, with a button to open the full log in your text editor.
+messages a pull would bring, with a button to open the full log in your text editor and a *Pull*
+button (*Sync* for a diverged branch) to bring them in.
 **Push all** pushes every repository that is only ahead, **Pull all** pulls
 every one that is only behind, and **Sync all** does both and also syncs the diverged ones. Rows
 are sorted by name; `panel_sort = "state"` puts syncable, then pushable, then pullable first. Click a repository name for

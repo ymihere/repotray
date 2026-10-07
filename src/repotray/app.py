@@ -24,8 +24,10 @@ from repotray.core.model import (
     control_menu,
     fallback_menu,
     panel_model,
+    pull_button,
     result_end,
     result_text,
+    sync_button,
 )
 from repotray.core.tooltip import tooltip_text
 from repotray.core.types import ActionKind, ActionResult, RepoState, Snapshot
@@ -284,7 +286,25 @@ class Controller:
             subtitle = f"{st.upstream} → {st.branch}, as of the last fetch"
         else:
             subtitle = "as of the last fetch"
-        show(title, subtitle, log, lambda: self.open_incoming_in_editor(name, st, log))
+        action = self.incoming_action(path)
+        show(
+            title,
+            subtitle,
+            log,
+            lambda: self.open_incoming_in_editor(name, st, log),
+            action=action,
+            on_action=(lambda: self.dispatch(action.action.value, path)) if action else None,
+        )
+
+    def incoming_action(self, path: Path):
+        """The button that brings the incoming commits in: Pull, or Sync for a diverged branch
+        (a fast-forward pull is impossible there). Same rules and tooltips as the panel row."""
+        st = self._repo(path)
+        if st is None or not st.pullable:
+            return None
+        if st.diverged:
+            return sync_button(st, self.snapshot, self.config)
+        return pull_button(st, self.snapshot)
 
     def open_incoming_in_editor(self, name: str, st, log) -> Path:
         """Write the full log to a text file and open it in the editor (config `editor`)."""

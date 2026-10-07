@@ -179,7 +179,9 @@ here*, *Open folder*, *Copy path*, *Fetch now*. *Show incoming commits* lists th
 pull would bring (`git log HEAD..@{upstream}`, read-only, as of the last fetch): subject,
 short hash, author, age and full message, up to 200; *Open in editor* writes the complete
 log to a text file and opens it in the `editor` (default: the desktop's text editor, xed on
-Mint). *Open terminal here* opens the desktop's default terminal (Preferred Applications on
+Mint). A primary **Pull** button at the bottom pulls and closes the dialog (the panel shows the
+result); for a diverged repo it is **Sync** instead, since a fast-forward pull is impossible;
+when blocked it is disabled and the dialog says why. *Open terminal here* opens the desktop's default terminal (Preferred Applications on
 Cinnamon), unless `terminal` is configured (decided 2026-10-07). Markers:
 `↑N` / `↓N` commit counts, `✎` uncommitted changes (tooltip reminds that push sends
 commits only), `⚠` the last fetch or action failed (tooltip: the error). Buttons are

@@ -132,11 +132,13 @@ class GtkBackendBase:
                 log.warning("notification failed: %s", exc)
         self.platform.notify(title, body)
 
-    def show_commits(self, title: str, subtitle: str, log, on_open_editor) -> None:
+    def show_commits(
+        self, title: str, subtitle: str, log, on_open_editor, action=None, on_action=None
+    ) -> None:
         from repotray.ui.gtk3.commits import CommitsDialog
 
         def make(parent):
-            dlg = CommitsDialog(parent, title, subtitle, log, on_open_editor)
+            dlg = CommitsDialog(parent, title, subtitle, log, on_open_editor, action, on_action)
             dlg.present()
             return dlg
 

@@ -22,8 +22,8 @@ All notable changes to this project are documented here. The format follows
 - *Push all* and *Pull all* buttons next to *Sync all*, at the top of the panel, in the fallback
   menu, and as `repotray push --all` / `repotray pull --all`.
 - *Show incoming commits…* in a repository's menu: the commit messages a pull would bring, with
-  *Open in editor* for the full log. New `editor` setting (default: the desktop's text editor),
-  also used by *Open config file*.
+  *Open in editor* for the full log and a *Pull* button (*Sync* for diverged branches). New
+  `editor` setting (default: the desktop's text editor), also used by *Open config file*.
 
 ## [0.1.0] — unreleased
 

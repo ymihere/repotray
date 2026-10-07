@@ -15,6 +15,11 @@ from gi.repository import Gtk, Pango  # noqa: E402
 from repotray.core.model import ago  # noqa: E402
 
 EDITOR_RESPONSE = 1
+ACTION_RESPONSE = 2
+ACTION_LABELS = {
+    "pull": ("Pull", "go-down-symbolic"),
+    "sync": ("Sync", "emblem-synchronizing-symbolic"),
+}
 
 
 def _epoch(iso: str) -> float | None:
@@ -32,7 +37,10 @@ class CommitsDialog(Gtk.Dialog):
         subtitle: str,
         log,
         on_open_editor: Callable[[], None],
+        action=None,
+        on_action: Callable[[], None] | None = None,
     ) -> None:
+        """``action`` is the model's Button for Pull (or Sync); None = no such button."""
         super().__init__(title=f"repotray — {title}", transient_for=parent, modal=False)
         self.set_default_size(640, 460)
         self.set_skip_taskbar_hint(True)
@@ -63,9 +71,30 @@ class CommitsDialog(Gtk.Dialog):
         sw.add(self.view)
         area.pack_start(sw, True, True, 0)
 
+        self.on_action = on_action
         self.add_button("Open in editor", EDITOR_RESPONSE)
         self.add_button("Close", Gtk.ResponseType.CLOSE)
         self.set_default_response(Gtk.ResponseType.CLOSE)
+        self.action_button = None
+        if action is not None and on_action is not None:
+            label, icon = ACTION_LABELS[action.action.value]
+            b = self.add_button(label, ACTION_RESPONSE)
+            b.set_image(Gtk.Image.new_from_icon_name(icon, Gtk.IconSize.BUTTON))
+            b.set_always_show_image(True)
+            b.get_style_context().add_class("suggested-action")
+            b.set_sensitive(action.enabled)
+            b.set_tooltip_text(action.tooltip)
+            self.action_button = b
+            if action.enabled:
+                self.set_default_response(ACTION_RESPONSE)
+            else:
+                # Insensitive buttons may not show tooltips: say why in the dialog itself.
+                reason = Gtk.Label(label=f"{label} is not possible right now: {action.tooltip}")
+                reason.set_xalign(0.0)
+                reason.set_line_wrap(True)
+                reason.get_style_context().add_class("dim-label")
+                head.pack_start(reason, False, False, 4)
+                reason.show()
         self.connect("response", self._response)
         self.show_all()
 
@@ -99,8 +128,10 @@ class CommitsDialog(Gtk.Dialog):
     def _response(self, _dialog, response) -> None:
         if response == EDITOR_RESPONSE:
             self.on_open_editor()
-        else:
-            self.destroy()
+            return
+        if response == ACTION_RESPONSE and self.on_action is not None:
+            self.on_action()  # the panel shows progress and the result
+        self.destroy()
 
 
 def _bold():

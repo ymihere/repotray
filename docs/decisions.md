@@ -126,6 +126,12 @@ Format: date — question → choice (reason).
   format) to `~/.cache/repotray/incoming-<name>.txt` and opens it with `editor`, else `xdg-open`
   (xed on Mint). Backends without dialogs open the editor directly. Only incoming commits were
   asked for; outgoing ones are not listed.
+- The incoming-commits dialog has a primary button that brings the commits in: *Pull* when the
+  repo is only behind, *Sync* when it diverged (a fast-forward pull cannot work there), with the
+  panel row's rules and tooltips. Clicking it starts the action and closes the dialog; progress and
+  the result appear in the panel (or as a notification when it is closed). When blocked
+  (uncommitted changes on a diverged branch, operation in progress, busy) it is disabled and the
+  reason is printed under the dialog's heading, because insensitive buttons may hide tooltips.
 
 ## Blocked / unverified
 - 2026-10-07 — **Live tray screenshots (M2, M3) while the session is locked.** The maintainer's

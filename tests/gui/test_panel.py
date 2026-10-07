@@ -66,11 +66,13 @@ class GtkTestBackend(FakeBackend):
         super().set_menus(control, fallback)
         self.panel.set_control_menu(control)
 
-    def show_commits(self, title, subtitle, log, on_open_editor):
+    def show_commits(self, title, subtitle, log, on_open_editor, action=None, on_action=None):
         from repotray.ui.gtk3.commits import CommitsDialog
 
         def make(parent):
-            self.dialog = CommitsDialog(parent, title, subtitle, log, on_open_editor)
+            self.dialog = CommitsDialog(
+                parent, title, subtitle, log, on_open_editor, action, on_action
+            )
             self.dialog.present()
             return self.dialog
 
@@ -263,5 +265,12 @@ def test_incoming_commits_dialog_keeps_panel_open(ui, monkeypatch):
     assert panel.get_visible()  # the dialog does not close the panel
     be.dialog.response(1)  # Open in editor
     assert opened and opened[0][0].name == "incoming-website.txt"
-    be.dialog.response(Gtk.ResponseType.CLOSE)
+    assert be.dialog.action_button.get_label() == "Pull"
+    assert be.dialog.action_button.get_sensitive()
+    be.dialog.action_button.clicked()  # pulls and closes the dialog
     pump(0.3)
+    assert not be.dialog.get_visible()
+    assert pump(4.0, lambda: "Pulled website" in panel.view.banner_label.get_text())
+    assert website.path not in [
+        c.path for r in panel.view.model.rows for c in (r.left, r.right) if c
+    ]

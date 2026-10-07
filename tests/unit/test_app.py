@@ -75,8 +75,8 @@ def test_incoming_with_dialog_backend(tmp_path):
     shown = []
 
     class DialogBackend(FakeBackend):
-        def show_commits(self, title, subtitle, log, on_open_editor):
-            shown.append((title, subtitle, log, on_open_editor))
+        def show_commits(self, title, subtitle, log, on_open_editor, action=None, on_action=None):
+            shown.append((title, subtitle, log, on_open_editor, action, on_action))
 
     cfg = tmp_path / "c.toml"
     cfg.write_text("")
@@ -86,12 +86,23 @@ def test_incoming_with_dialog_backend(tmp_path):
     ctl.render()
     ctl.dispatch("show_incoming", website(ctl).path)
     assert run_ui(ctl, lambda: shown)
-    title, subtitle, log, open_editor = shown[0]
+    title, subtitle, log, open_editor, action, on_action = shown[0]
     assert title == "website: 4 incoming commits"
     assert subtitle == "origin/main → main, as of the last fetch"
     assert log.total == 4 and len(log.commits) == 4
+    assert action.action.value == "pull" and action.enabled
+    assert action.tooltip == "Pull 4 commits from origin/main (fast-forward)"
     open_editor()
     assert plat.opened and plat.opened[0][1] == ""  # no editor configured: desktop default
+
+
+def test_incoming_action_is_sync_when_diverged(tmp_path):
+    ctl, _ = make(tmp_path)
+    by = {s.name: s for s in ctl.snapshot.repos}
+    assert ctl.incoming_action(by["website"].path).action.value == "pull"
+    sync = ctl.incoming_action(by["design-system"].path)
+    assert sync.action.value == "sync" and sync.enabled
+    assert ctl.incoming_action(by["api-gateway"].path) is None  # nothing to pull
 
 
 def test_open_config_uses_editor_setting(tmp_path):
