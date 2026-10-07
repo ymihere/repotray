@@ -27,5 +27,16 @@ Format: date — question → choice (reason).
   "pause" issued just before a due fetch wins.
 - 2026-10-07 — macOS state dir is `~/Library/Logs/repotray` (logs live there); Windows cache dir is
   `%LOCALAPPDATA%\repotray\cache`.
+- 2026-10-07 — Octicons fetched online (repo-16.svg identical to the path in PLAN §4.12; LICENSE
+  says "Copyright (c) 2026 GitHub Inc.", copied verbatim).
+- 2026-10-07 — Dot circles in the build use `quad_segs=32` for the r=4 knockout (128-gon), so every
+  glyph vertex stays ≥ 3.99 from a dot centre.
+- 2026-10-07 — `scripts/dev/preview-icons.py` uses Adwaita-like theme colours (success #33d17a,
+  warning #f27835, error #e01b24) for the preview; real panels use their own.
 
 ## Blocked / unverified
+- 2026-10-07 — **Live tray screenshots (M2, M3) while the session is locked.** The maintainer's
+  screen locked during the run (cinnamon-screensaver active); root-window captures then show only
+  the lock-screen wallpaper. Icons were verified offline with GTK's symbolic loader (contact sheet),
+  the panel by rendering it offscreen (`Gtk.OffscreenWindow`). The live checks are repeated whenever
+  the session is unlocked during the run; see HANDOFF.md for what remained unverified.

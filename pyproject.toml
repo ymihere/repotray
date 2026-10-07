@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Tray indicator that shows which of your local git clones have work to push or pull"
 readme = "README.md"
 license = "MIT"
-license-files = ["LICENSE"]
+license-files = ["LICENSE", "src/repotray/icons/data/LICENSE-octicons"]
 requires-python = ">=3.11"
 authors = [{ name = "Andreas Bonelli" }]
 keywords = ["git", "tray", "indicator", "cinnamon", "status", "repositories"]
