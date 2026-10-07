@@ -71,6 +71,17 @@ Format: date — question → choice (reason).
   conformance suite accepts a backend-declared UI thread.
 - 2026-10-07 — `gtkstatusicon` anchors the panel from `get_geometry()`: bottom/top/left/right is
   inferred from where the icon sits on its monitor.
+- 2026-10-07 — CI on Windows skips the real-git integration tests and the symlink/permission/
+  shebang unit tests (POSIX fixtures); Windows is covered by the unit tests with mocks only.
+- 2026-10-07 — `install.sh` installs only for the current user, never with sudo; it writes a
+  `~/.local/share/applications/repotray.desktop` menu entry besides the launcher. `uninstall.sh`
+  removes manifest-listed paths only when they are under `$HOME`, then removes directories it may
+  have created if (and only if) they are empty.
+- 2026-10-07 — README screenshots: the panel is rendered offscreen from `--demo` (so no other
+  window can leak into it); the tray image is a live `--demo` capture cropped to repotray's icon
+  and label.
+- 2026-10-07 — The porting guide's example plugin was extracted from docs/porting.md, installed
+  into a scratch venv and run (`repotray tray --demo --backend hello`): it works as documented.
 
 ## Blocked / unverified
 - 2026-10-07 — **Live tray screenshots (M2, M3) while the session is locked.** The maintainer's
@@ -84,3 +95,6 @@ Format: date — question → choice (reason).
   click first moves focus to the panel applet, which the 300 ms reopen guard handles (unit-tested,
   not observed live).
 - macOS and Windows platforms and the pystray backend there were only unit-tested with mocks.
+- `shellcheck` is not installed on the dev machine; the scripts were checked with `bash -n`/`sh -n`
+  and an install → reinstall → uninstall round trip into a temporary `HOME`.
+- The GitHub workflows have never run (nothing is pushed); YAML was validated locally.

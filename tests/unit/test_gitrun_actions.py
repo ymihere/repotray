@@ -3,6 +3,8 @@ import sys
 import time
 from pathlib import Path
 
+import pytest
+
 from repotray.core.actions import (
     ActionContext,
     RepoLocks,
@@ -54,6 +56,7 @@ def test_runner_command_and_missing_git(tmp_path):
     )
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="shebang script")
 def test_runner_timeout_kills_group(tmp_path):
     script = tmp_path / "fake-git"
     script.write_text(f"#!{sys.executable}\nimport time, subprocess, sys\n"

@@ -1,0 +1,50 @@
+name: Platform report
+description: Report how repotray works on a desktop or OS (see docs/porting.md)
+labels: [platform]
+body:
+  - type: input
+    id: os
+    attributes:
+      label: OS and version
+      placeholder: e.g. Fedora 41, macOS 15.1, Windows 11 23H2
+    validations:
+      required: true
+  - type: input
+    id: desktop
+    attributes:
+      label: Desktop environment and session type
+      placeholder: e.g. KDE Plasma 6.2, Wayland
+    validations:
+      required: true
+  - type: input
+    id: backend
+    attributes:
+      label: Backend used
+      placeholder: xapp / appindicator / gtkstatusicon / pystray / a plugin
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Output of `repotray doctor`
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: conformance
+    attributes:
+      label: Conformance suite results
+      description: "`REPOTRAY_BACKEND=<name> REPOTRAY_GUI_TESTS=1 pytest tests/conformance -v`"
+      render: text
+  - type: textarea
+    id: works
+    attributes:
+      label: What works and what does not
+      description: Icon in each state, label, tooltip, menu, panel (placement, closing), actions, notifications, autostart.
+    validations:
+      required: true
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots
+      description: Taken with `repotray tray --demo`.

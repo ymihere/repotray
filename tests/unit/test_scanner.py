@@ -1,5 +1,8 @@
 import os
+import sys
 from pathlib import Path
+
+import pytest
 
 from repotray.core.config import Config, RepoOverride
 from repotray.core.gitrun import GitResult
@@ -79,6 +82,10 @@ def test_bare_repo_ignored(tmp_path):
     assert found(cfg(tmp_path)) == set()
 
 
+posix_only = pytest.mark.skipif(sys.platform == "win32", reason="symlinks/permissions")
+
+
+@posix_only
 def test_symlink_loop_and_symlinked_dirs_not_followed(tmp_path):
     mkrepo(tmp_path / "real/repo")
     os.symlink(tmp_path, tmp_path / "real/loop")
@@ -86,6 +93,7 @@ def test_symlink_loop_and_symlinked_dirs_not_followed(tmp_path):
     assert found(cfg(tmp_path, max_depth=12)) == {"real/repo"}
 
 
+@posix_only
 def test_symlinked_root_is_followed(tmp_path):
     mkrepo(tmp_path / "target/repo")
     os.symlink(tmp_path / "target", tmp_path / "link")
@@ -107,6 +115,10 @@ def test_missing_root_and_bad_repos_entry_warn(tmp_path):
     assert len(warnings) == 2
 
 
+@pytest.mark.skipif(
+    sys.platform == "win32" or (hasattr(os, "geteuid") and os.geteuid() == 0),
+    reason="needs POSIX permissions as non-root",
+)
 def test_permission_error_ignored(tmp_path):
     mkrepo(tmp_path / "ok")
     locked = tmp_path / "locked"

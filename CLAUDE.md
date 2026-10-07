@@ -11,7 +11,7 @@ click opens a panel with push / pull / sync buttons.
 
 ## Status (2026-10-07)
 M0–M4 done (core, CLI, icons, XApp/AppIndicator/GtkStatusIcon/pystray backends, GTK panel,
-verified live on Cinnamon with --demo). Next: PLAN.md milestone M5. Implementation choices are
+verified live on Cinnamon with --demo), docs, install scripts, CI, packaging. Next: PLAN.md M6. Implementation choices are
 logged in `docs/decisions.md`.
 
 ## Decisions already made

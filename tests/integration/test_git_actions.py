@@ -22,7 +22,11 @@ from repotray.core.gitstatus import check_status, fetch_repo
 from repotray.core.scanner import scan
 from repotray.core.types import ActionKind
 
-pytestmark = pytest.mark.integration
+pytestmark = [
+    pytest.mark.integration,
+    # Hooks, chmod and TCP fixtures assume POSIX; Windows coverage is unit tests only for now.
+    pytest.mark.skipif(sys.platform == "win32", reason="POSIX-only fixtures"),
+]
 
 
 def info_for(path: Path):
