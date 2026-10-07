@@ -10,9 +10,10 @@ click opens a panel with push / pull / sync buttons.
 - **`CLAUDE.local.md`** (gitignored, may be absent) — facts about the maintainer's dev machine.
 
 ## Status (2026-10-07)
-M0–M4 done (core, CLI, icons, XApp/AppIndicator/GtkStatusIcon/pystray backends, GTK panel,
-verified live on Cinnamon with --demo), docs, install scripts, CI, packaging. Next: PLAN.md M6. Implementation choices are
-logged in `docs/decisions.md`.
+0.1.0 release candidate: PLAN.md milestones M0–M6 done, committed locally, not pushed or
+published (the maintainer does that, see RELEASING.md). Installed for the maintainer with
+`scripts/install.sh` (no autostart). Implementation choices: `docs/decisions.md`; hand-off notes:
+`HANDOFF.md` (gitignored).
 
 ## Decisions already made
 - Name: repotray. Licence: MIT. Python ≥ 3.11, zero PyPI runtime dependencies on Linux.

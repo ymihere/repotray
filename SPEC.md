@@ -8,9 +8,10 @@ left, the pullable ones on the right, and one-click push / pull / sync buttons.
 Platform independent; Linux Mint Cinnamon is the first-class target and must look
 native there.
 
-Status: spec complete, no code yet (2026-10-05). How it is built — module layout,
-interfaces, milestones and acceptance checks — is in `PLAN.md`, which also settles every
-question this spec left open.
+Status: implemented as 0.1.0 release candidate (2026-10-07). How it is built — module
+layout, interfaces, milestones and acceptance checks — is in `PLAN.md`, which also settles
+every question this spec left open; implementation choices are logged in
+`docs/decisions.md`.
 
 ---
 
@@ -175,7 +176,8 @@ then arrive as desktop notifications (§2.4).
 **Groups below the columns** (each hidden when empty; names are clickable chips with
 the same context menu):
 - `✎ Uncommitted (N)` — every dirty repo, including those already in the Push column.
-- `⚠ No upstream (N)`, `Detached (N)`, `⚠ Fetch failed (N)` (tooltip: the error).
+- `⚠ No upstream (N)`, `Detached (N)`, `⚠ In progress (N)` (a rebase/merge/… is under way),
+  `⚠ Fetch failed (N)` (tooltip: the error), `⚠ Unreadable (N)` (`git status` failed).
 - `▸ In sync (N)` — collapsed expander listing the clean repos, so one can confirm
   that a repo is being watched without the CLI.
 
@@ -383,6 +385,8 @@ orange when anything needs doing.
 - Other Linux desktops: KDE/XFCE via StatusNotifierItem or AppIndicator (icon by
   theme name, so the same symbolic SVGs work; KDE recolors symbolic icons too).
   GNOME needs the AppIndicator extension; no tooltip there, the label and the panel carry the counts.
+  On Cinnamon an AppIndicator icon is shown through `xapp-sn-watcher`, which drops the label
+  (verified 2026-10-07), so the XApp backend stays the default there.
 
 ### macOS
 Template images (black glyph + alpha, `isTemplate = true`) so the menu bar tints them

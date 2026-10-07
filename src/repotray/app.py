@@ -331,25 +331,26 @@ def run_tray(
     from repotray.platform import current
 
     platform = platform or current()
-    if not demo:
-        try:
-            cfgmod.ensure_exists(config_file)
-        except OSError as exc:
-            print(f"repotray: cannot write {config_file}: {exc}", file=sys.stderr)
-    watcher = ConfigWatcher(config_file)
-    cfg = watcher.load()
-    setup_logging(platform, cfg.log_level, verbose)
-    sys.excepthook = _excepthook
-    threading.excepthook = lambda a: log.error(
-        "unhandled exception in %s", a.thread, exc_info=(a.exc_type, a.exc_value, a.exc_traceback)
-    )
-
     lock = platform.acquire_instance_lock(platform.lock_path())
     if lock is None:
         pid = platform.read_lock_pid(platform.lock_path())
         print(f"repotray is already running (pid {pid})", file=sys.stderr)
         return 0
     try:
+        if not demo:
+            try:
+                cfgmod.ensure_exists(config_file)
+            except OSError as exc:
+                print(f"repotray: cannot write {config_file}: {exc}", file=sys.stderr)
+        watcher = ConfigWatcher(config_file)
+        cfg = watcher.load()
+        setup_logging(platform, cfg.log_level, verbose)
+        sys.excepthook = _excepthook
+        threading.excepthook = lambda a: log.error(
+            "unhandled exception in %s",
+            a.thread,
+            exc_info=(a.exc_type, a.exc_value, a.exc_traceback),
+        )
         try:
             platform.install_icons(symbolic_dir())
         except OSError as exc:

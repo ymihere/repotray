@@ -172,9 +172,20 @@ def test_focus_loss_hides(ui):
     thief = Gtk.Window(title="focus thief")
     thief.set_default_size(100, 100)
     thief.show_all()
-    thief.present()
+    pump(0.1)
     try:
-        assert pump(3.0, lambda: not panel.get_visible())
+        # A timestamped present, like a real click; without one Muffin's focus-stealing
+        # prevention sometimes keeps focus on the panel.
+        from gi.repository import GdkX11
+
+        thief.present_with_time(GdkX11.x11_get_server_time(thief.get_window()))
+    except (ImportError, TypeError, AttributeError):
+        thief.present()
+    try:
+        pump(3.0, lambda: thief.is_active() or not panel.get_visible())
+        if panel.get_visible() and panel.is_active():
+            pytest.skip("window manager kept focus on the panel")
+        assert pump(1.0, lambda: not panel.get_visible())
     finally:
         thief.destroy()
 

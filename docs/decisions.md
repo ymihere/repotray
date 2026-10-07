@@ -82,6 +82,12 @@ Format: date — question → choice (reason).
   and label.
 - 2026-10-07 — The porting guide's example plugin was extracted from docs/porting.md, installed
   into a scratch venv and run (`repotray tray --demo --backend hello`): it works as documented.
+- 2026-10-07 — `run_tray` takes the instance lock before writing the default config, so a second
+  instance never creates files. (Found in M6: an M3 second-instance check had written the default
+  config; it was confirmed identical to the default and then given the maintainer's roots.)
+- 2026-10-07 — `test_focus_loss_hides` presents its helper window with the X server timestamp:
+  without one, Muffin's focus-stealing prevention occasionally kept focus on the panel (1 flaky
+  failure in ~10 runs); the test skips only if the WM still refuses.
 
 ## Blocked / unverified
 - 2026-10-07 — **Live tray screenshots (M2, M3) while the session is locked.** The maintainer's
