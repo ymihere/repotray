@@ -142,6 +142,6 @@ Format: date — question → choice (reason).
 - `shellcheck` is not installed on the dev machine; the scripts were checked with `bash -n`/`sh -n`
   and an install → reinstall → uninstall round trip into a temporary `HOME`.
 - The GitHub workflows have never run (nothing is pushed); YAML was validated locally.
-- 2026-10-07 — `docs/images/tray.png` still shows the earlier green ▲: the session was locked when
-  the orange default landed, and the tray image is a live capture. Refresh it with
-  `repotray tray --demo` + `scripts/dev/screenshot.py tray` when unlocked.
+- 2026-10-07 — `docs/images/tray.png` re-captured live from `--demo` with both markers orange
+  (the session had been locked when the orange default landed). The maintainer confirmed that
+  gnome-terminal and xed now open as expected.
