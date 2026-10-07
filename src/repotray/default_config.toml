@@ -1,0 +1,62 @@
+# repotray configuration.
+# Every key is optional; the values shown are the defaults. The tray reloads this file
+# automatically when it changes. Full reference: docs/configuration.md
+
+# Directories searched for git clones, and extra repositories outside them.
+roots = ["~"]
+repos = []
+# Glob patterns (matched against the absolute path) of repositories to leave out.
+ignore = []
+# How deep to look below each root, and whether to look inside repositories for nested ones.
+max_depth = 4
+descend_into_repos = false
+# Directory names never descended into. Hidden directories are always skipped below a root.
+exclude_dirs = ["node_modules", "vendor", "target", "build", "dist", "venv", "__pycache__", "snap", "Library", "AppData"]
+
+# Seconds between local status checks, remote fetches and directory rescans.
+status_interval = 60
+fetch_interval = 600
+rescan_interval = 600
+# Parallel git processes for status checks, and for fetches and actions.
+workers = 4
+fetch_workers = 4
+fetch_timeout = 60
+
+count_untracked_as_dirty = true
+count_no_upstream_as_push = false
+# Desktop notifications when a repo falls behind or fetching starts failing.
+notifications = false
+
+# How Sync reconciles a diverged branch: "rebase" (pull --rebase, then push) or "merge".
+sync_strategy = "rebase"
+action_timeout = 120
+
+# Commands with {path} substituted. Empty = detect automatically.
+terminal = ""
+file_manager = ""
+
+# auto | xapp | appindicator | gtkstatusicon | pystray | a plugin name
+backend = "auto"
+# auto | dark | light | system
+panel_theme = "auto"
+# debug | info | warning
+log_level = "info"
+
+[indicator]
+# Text next to the icon: push ↑N, pull ↓N, dirty ✎N. [] = no label.
+label = ["push", "pull"]
+# Corner dots and a tint of the whole glyph, each shown when any of its triggers applies.
+# Colours: foreground | warning | error | success (theme colours), or "#rrggbb".
+top_dot = ["push"]
+top_dot_color = "success"
+bottom_dot = ["pull"]
+bottom_dot_color = "warning"
+tint = []
+tint_color = "warning"
+# Glyph colour, only used when a "#rrggbb" colour above forces full-colour icons.
+glyph_color = "#e1e1e1"
+
+# Per-repository settings:
+# [repo."~/work/huge-monorepo"]
+# fetch = false
+# name = "monorepo"

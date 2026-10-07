@@ -10,7 +10,7 @@ click opens a panel with push / pull / sync buttons.
 - **`CLAUDE.local.md`** (gitignored, may be absent) — facts about the maintainer's dev machine.
 
 ## Status (2026-10-07)
-M0 done (skeleton, pyproject, dev-setup.sh). Next: PLAN.md milestone M1. Implementation choices are
+M0–M1 done (skeleton; headless core, platform layer, CLI, 151 tests). Next: PLAN.md milestone M2. Implementation choices are
 logged in `docs/decisions.md`.
 
 ## Decisions already made
