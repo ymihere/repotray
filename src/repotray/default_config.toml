@@ -37,7 +37,7 @@ terminal = ""
 file_manager = ""
 editor = ""
 
-# auto | xapp | appindicator | gtkstatusicon | pystray | a plugin name
+# auto | xapp | appindicator | gtkstatusicon | qt | pystray | a plugin name
 backend = "auto"
 # auto | dark | light | system
 panel_theme = "auto"

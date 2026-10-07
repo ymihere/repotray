@@ -106,10 +106,19 @@ class WindowsPlatform(BasePlatform):
     def notify(self, title: str, body: str) -> bool:
         return False  # pystray's own notify is used; there is no stdlib fallback
 
-    def autostart_argv(self) -> list[str]:
-        exe = Path(sys.executable)
+    def tray_argv(self, executable: str = sys.executable) -> list[str]:
+        """How autostart launches the tray: without a console window, from this installation.
+        ``repotrayw.exe`` (the GUI launcher pip creates next to ``repotray.exe``), else
+        ``pythonw -m repotray``; ``repotray.exe`` would keep a console window open."""
+        exe = Path(executable)
+        for scripts in (exe.parent, exe.parent / "Scripts"):
+            launcher = scripts / "repotrayw.exe"
+            if launcher.exists():
+                return [str(launcher), "tray"]
         pythonw = exe.with_name("pythonw.exe")
-        return [str(pythonw if pythonw.exists() else exe), "-m", "repotray"]
+        if not pythonw.exists():
+            raise FileNotFoundError(f"neither repotrayw.exe nor pythonw.exe next to {exe}")
+        return [str(pythonw), "-m", "repotray", "tray"]
 
     def autostart_enable(self, argv: list[str]) -> str:
         wr = self.winreg

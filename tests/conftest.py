@@ -9,6 +9,11 @@ from pathlib import Path
 
 import pytest
 
+# Qt tests run on Qt's offscreen platform (no display needed) unless a real desktop is asked for.
+# Set before any test module creates a QApplication.
+if os.environ.get("REPOTRAY_GUI_TESTS") != "1":
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
 
 @pytest.fixture(autouse=True)
 def isolated_env(tmp_path_factory, monkeypatch):

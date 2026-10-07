@@ -29,8 +29,8 @@ into.
   so the repository is left exactly as it was, and status checks never write to your repos.
 - **Headless CLI.** `repotray status`, `scan`, `fetch`, `push`, `pull`, `sync` work without a GUI.
 - **Portable.** Backends for XApp (Cinnamon, MATE, Xfce), AppIndicator (KDE, GNOME with the
-  extension), Gtk.StatusIcon (X11) and pystray (macOS, Windows — experimental). New backends can
-  live in separate packages.
+  extension), Gtk.StatusIcon (X11), Qt (Windows, with the same panel) and pystray (macOS —
+  experimental). New backends can live in separate packages.
 
 ## Install
 
@@ -52,9 +52,23 @@ status applet: `sudo apt install gir1.2-ayatanaappindicator3-0.1` (Debian/Ubuntu
 **pipx** (once published on PyPI): `pipx install --system-site-packages repotray`
 (`--system-site-packages` lets it see the system's PyGObject).
 
-**macOS / Windows** (experimental, untested by the maintainer): `pip install repotray`, then run
-`repotray`. You get the icon, tooltip and a menu with the same actions; the panel is Linux-only
-for now.
+**Windows 10 / 11.** Needs [Python](https://www.python.org/downloads/) ≥ 3.11 and
+[Git for Windows](https://git-scm.com/download/win). From a clone:
+
+```powershell
+pip install .                   # or: pipx install .   (pulls in Qt: PySide6-Essentials)
+repotrayw                       # starts the tray without a console window
+repotray autostart enable       # start it at login
+```
+
+Same panel as on Linux, in Qt: left click opens it above the tray icon, right click shows the
+control menu, middle click fetches. If the icon lands in the hidden-icons overflow (`^`), drag it
+onto the taskbar. The taskbar shows no text next to tray icons, so the counts are in the tooltip
+and the panel.
+
+**macOS** (experimental, untested by the maintainer): `pip install repotray`, then run
+`repotray`. You get the icon, tooltip and a menu with the same actions (pystray);
+`pip install "repotray[qt]"` and `--backend qt` give the panel, untested there.
 
 ## Usage
 
@@ -83,8 +97,8 @@ minute, and backs off when the network is down.
 
 ## Configuration
 
-The config file is created on first run at `~/.config/repotray/config.toml` and reloaded
-automatically when you save it. The most useful keys:
+The config file is created on first run at `~/.config/repotray/config.toml` (Windows:
+`%APPDATA%\repotray\config.toml`) and reloaded automatically when you save it. The most useful keys:
 
 ```toml
 roots = ["~/code", "~/work"]      # where to look for clones (default: your home)
@@ -142,7 +156,9 @@ Details, exit codes and the JSON schema: [docs/cli.md](docs/cli.md).
 | MATE, Xfce with the XApp applet | xapp | Expected to work |
 | KDE Plasma, GNOME + AppIndicator extension | appindicator | Expected to work (no tooltip) |
 | Wayland sessions | appindicator | Expected to work; panel opens at the pointer |
-| macOS, Windows | pystray | Experimental, untested — help wanted |
+| Windows 11 | qt | **Tested** — icon, tooltip, panel, menus, dialogs |
+| Windows 10 | qt | Expected to work (icons from Segoe MDL2 Assets, square corners) |
+| macOS | pystray | Experimental, untested — help wanted |
 
 Ports are welcome: see [docs/porting.md](docs/porting.md).
 

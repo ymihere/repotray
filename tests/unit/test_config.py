@@ -167,3 +167,16 @@ def test_scan_key_changes():
     a = Config()
     assert a.scan_key() == Config(status_interval=30).scan_key()
     assert a.scan_key() != Config(max_depth=2).scan_key()
+
+
+def test_abbreviate_uses_one_kind_of_slash():
+    import os
+    from pathlib import Path
+
+    from repotray.core.config import abbreviate
+
+    home = Path.home()
+    assert abbreviate(home) == "~"
+    assert abbreviate(home / "code" / "x") == f"~{os.sep}code{os.sep}x"
+    outside = Path(home.anchor) / "elsewhere" / "repo"
+    assert abbreviate(outside) == str(outside)

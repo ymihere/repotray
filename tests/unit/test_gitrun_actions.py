@@ -1,4 +1,5 @@
 import os
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -17,6 +18,7 @@ from repotray.core.gitrun import (
     CallKind,
     GitResult,
     GitRunner,
+    batch_ssh_command,
     first_line,
     git_environment,
     strip_credentials,
@@ -177,3 +179,47 @@ def test_busy_lock(tmp_path):
             lock_timeout=0.1,
         )
     assert not res.ok and res.message.startswith("busy")
+
+
+# --- ssh: the user's own ssh command keeps working, batch mode is added -------------------------
+
+PLINK = r'"C:\Program Files\PuTTY\plink.exe" -agent'
+
+
+@pytest.mark.parametrize(
+    ("configured", "expected"),
+    [
+        (None, "ssh -oBatchMode=yes"),
+        ("", "ssh -oBatchMode=yes"),
+        (
+            "C:/Windows/System32/OpenSSH/ssh.exe",
+            "C:/Windows/System32/OpenSSH/ssh.exe -oBatchMode=yes",
+        ),
+        ("ssh -i ~/.ssh/work", "ssh -i ~/.ssh/work -oBatchMode=yes"),
+        (PLINK, f"{PLINK} -batch"),
+        ("TortoisePlink.exe", "TortoisePlink.exe -batch"),
+    ],
+)
+def test_batch_ssh_command(configured, expected):
+    assert batch_ssh_command(configured) == expected
+
+
+def test_environment_keeps_core_ssh_command_and_user_overrides():
+    env = git_environment(CallKind.FETCH, base={}, ssh_command="C:/OpenSSH/ssh.exe")
+    assert env["GIT_SSH_COMMAND"] == "C:/OpenSSH/ssh.exe -oBatchMode=yes"
+    # GIT_SSH (a program) is the user's choice too: setting GIT_SSH_COMMAND would override it.
+    env = git_environment(CallKind.FETCH, base={"GIT_SSH": "C:/plink.exe"})
+    assert "GIT_SSH_COMMAND" not in env and env["GIT_SSH"] == "C:/plink.exe"
+
+
+def test_runner_reads_core_ssh_command_for_network_calls_only(tmp_path, monkeypatch):
+    monkeypatch.delenv("GIT_SSH_COMMAND", raising=False)
+    monkeypatch.delenv("GIT_SSH", raising=False)
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    subprocess.run(
+        ["git", "-C", str(tmp_path), "config", "core.sshCommand", "my-ssh -p 2222"], check=True
+    )
+    r = GitRunner()
+    assert r.configured_ssh(tmp_path) == "my-ssh -p 2222"
+    monkeypatch.setenv("GIT_SSH_COMMAND", "ssh -v")
+    assert r.configured_ssh(tmp_path) is None  # the environment wins, nothing to look up

@@ -5,11 +5,33 @@ Drawn at 4× from geometry.json and downsampled with LANCZOS.
 
 from __future__ import annotations
 
+import logging
+import sys
+
 from repotray.core.indicator import IconSpec
 from repotray.icons import geometry
 from repotray.icons.svg import glyph_rings, resolve
 
+log = logging.getLogger(__name__)
+
 SUPERSAMPLE = 4
+LIGHT_GLYPH = "#e1e1e1"  # on a dark taskbar / menu bar
+DARK_GLYPH = "#1e1e1e"  # on a light one
+
+
+def bar_glyph_color(platform) -> str:
+    """Glyph colour for a pixmap tray icon, from the taskbar's (menu bar's) dark/light setting.
+
+    Unknown setting: dark on macOS, light elsewhere (Windows' default taskbar is dark).
+    """
+    try:
+        dark = platform.prefers_dark_panel()
+    except Exception:  # noqa: BLE001 - a broken registry/defaults read must not stop the tray
+        log.warning("reading the taskbar theme failed", exc_info=True)
+        dark = None
+    if dark is None:
+        dark = sys.platform != "darwin"
+    return LIGHT_GLYPH if dark else DARK_GLYPH
 
 
 def _rgb(hex_color: str) -> tuple[int, int, int]:

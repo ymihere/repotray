@@ -21,6 +21,7 @@ BUILTINS: dict[str, str] = {
     "xapp": "repotray.backends.xapp:XAppBackend",
     "appindicator": "repotray.backends.appindicator:AppIndicatorBackend",
     "gtkstatusicon": "repotray.backends.gtkstatusicon:GtkStatusIconBackend",
+    "qt": "repotray.backends.qt:QtBackend",
     "pystray": "repotray.backends.pystray_backend:PystrayBackend",
     "fake": "repotray.backends.fake:FakeBackend",
 }

@@ -9,7 +9,7 @@ core  ←  platform  ←  app  ←  backends / ui
 ```
 
 An arrow means "may import". Enforced by `tests/unit/test_layering.py`, which blocks `gi`,
-`pystray` and `PIL` and imports every headless module.
+`pystray`, `PIL` and `PySide6` and imports every headless module.
 
 | Package | Contents | Imports |
 |---|---|---|
@@ -17,8 +17,8 @@ An arrow means "may import". Enforced by `tests/unit/test_layering.py`, which bl
 | `repotray.platform` | the `Platform` protocol: directories, terminal/folder/file opening, notifications fallback, autostart, instance lock, process groups, icon installation; Linux, macOS, Windows | stdlib (+ `fcntl`, `msvcrt`, `winreg` lazily) |
 | `repotray.icons` | icon names, full-colour SVG (hex mode), Pillow rasters — all from the committed `data/` | stdlib (Pillow lazily in `raster`) |
 | `repotray.app` | `Controller` (the only API a UI calls), tray startup | core, platform |
-| `repotray.backends` | `TrayBackend` protocol, registry, built-in backends | gi / pystray inside each backend module |
-| `repotray.ui` | `placement` (pure geometry); `gtk3` (panel, menus, details, theme) | gi in `gtk3` only |
+| `repotray.backends` | `TrayBackend` protocol, registry, built-in backends | gi / PySide6 / pystray inside each backend module |
+| `repotray.ui` | `placement` (pure geometry), `text` (dialog texts); `gtk3` (panel, menus, details, theme); `qt` (the same panel, menus and dialogs in Qt 6, icons, Win32 helpers) | gi in `gtk3`, PySide6 in `qt` only |
 | `repotray.cli` | argparse front end; headless except `tray` | core, platform |
 
 ## Threads and data flow
@@ -66,16 +66,23 @@ preconditions and only then runs git:
   timeout, `rebase --abort` / `merge --abort`, then verify HEAD and the absence of an operation in
   progress → `ActionResult.restored`.
 
-## Panel (Linux)
+## Panel
 
-`ui/gtk3/panel.py`: `PanelView` lays out a `PanelModel` and rebuilds only the sections whose model
-changed; `Panel` is the undecorated window: placement from `ui/placement.py`, hide on Escape, focus
-loss or a second click, and a 300 ms guard against the click that caused the focus loss reopening
-it. `scripts/dev/render-panel.py` renders the view offscreen.
+`ui/gtk3/panel.py` (Linux): `PanelView` lays out a `PanelModel` and rebuilds only the sections whose
+model changed; `Panel` is the undecorated window: placement from `ui/placement.py`, hide on Escape,
+focus loss or a second click, and a 300 ms guard against the click that caused the focus loss
+reopening it. `scripts/dev/render-panel.py` renders the view offscreen.
+
+`ui/qt/panel.py` (Windows, `qt` backend) is the same design in Qt 6, widget for widget, with the
+same behaviour. Qt-specific: `Panel.fit()` delivers pending layout requests before resizing (Qt
+computes nested layouts lazily), the window is re-placed whenever its size changes so it stays flush
+with the taskbar, and if Windows refuses to give the new panel focus it asks once through
+`ui/qt/winapi.py` — without focus it could not notice a click elsewhere.
+`scripts/dev/render-panel-qt.py` renders it to PNGs.
 
 ## Icons
 
 `tools/build_icons.py` (dev-only; shapely, svgpathtools) turns the Octicon `repo` glyph into 102
 symbolic SVGs with the dot knockouts baked into the path, plus `geometry.json`, which
-`icons/svg.py` (full-colour mode) and `icons/raster.py` (pystray) draw from. The output is committed;
+`icons/svg.py` (full-colour mode) and `icons/raster.py` (pystray, Qt) draw from. The output is committed;
 a test regenerates it and compares.

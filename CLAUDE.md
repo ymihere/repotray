@@ -19,6 +19,8 @@ published (the maintainer does that, see RELEASING.md). Installed for the mainta
 - Name: repotray. Licence: MIT. Python ≥ 3.11, zero PyPI runtime dependencies on Linux.
 - Platform independent core; Linux Mint Cinnamon is the first-class target. Other desktops/OSes plug in
   through the backend and platform registries (PLAN §4); contributors port without touching the core.
+- Windows (2026-10-07): `qt` backend (PySide6) with the same panel as GTK (`ui/qt/`, texts shared via
+  `ui/text.py`); pystray stays for macOS. Keep the two panels in step: a panel change goes into both.
 - On Cinnamon the icon must match the other tray icons: monochrome **symbolic** SVG recoloured by the
   panel. Reference icons by theme name, never pixmaps.
 - Left click opens a **panel** (Gtk 3 window, not a menu): **one row per repo**, its push cell left,

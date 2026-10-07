@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import datetime
 import time
 from collections.abc import Callable
 
@@ -12,21 +11,17 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
 from gi.repository import Gtk, Pango  # noqa: E402
 
-from repotray.core.model import ago  # noqa: E402
+from repotray.core.model import ACTION_ICONS, ago  # noqa: E402
+from repotray.ui.text import (  # noqa: E402
+    ACTION_LABELS,
+    NO_INCOMING_TEXT,
+    blocked_text,
+    commit_epoch,
+    more_commits_text,
+)
 
 EDITOR_RESPONSE = 1
 ACTION_RESPONSE = 2
-ACTION_LABELS = {
-    "pull": ("Pull", "go-down-symbolic"),
-    "sync": ("Sync", "emblem-synchronizing-symbolic"),
-}
-
-
-def _epoch(iso: str) -> float | None:
-    try:
-        return datetime.datetime.fromisoformat(iso).timestamp()
-    except ValueError:
-        return None
 
 
 class CommitsDialog(Gtk.Dialog):
@@ -77,8 +72,9 @@ class CommitsDialog(Gtk.Dialog):
         self.set_default_response(Gtk.ResponseType.CLOSE)
         self.action_button = None
         if action is not None and on_action is not None:
-            label, icon = ACTION_LABELS[action.action.value]
+            label = ACTION_LABELS[action.action.value]
             b = self.add_button(label, ACTION_RESPONSE)
+            icon = ACTION_ICONS[action.action]
             b.set_image(Gtk.Image.new_from_icon_name(icon, Gtk.IconSize.BUTTON))
             b.set_always_show_image(True)
             b.get_style_context().add_class("suggested-action")
@@ -89,7 +85,7 @@ class CommitsDialog(Gtk.Dialog):
                 self.set_default_response(ACTION_RESPONSE)
             else:
                 # Insensitive buttons may not show tooltips: say why in the dialog itself.
-                reason = Gtk.Label(label=f"{label} is not possible right now: {action.tooltip}")
+                reason = Gtk.Label(label=blocked_text(label, action.tooltip))
                 reason.set_xalign(0.0)
                 reason.set_line_wrap(True)
                 reason.get_style_context().add_class("dim-label")
@@ -109,21 +105,18 @@ class CommitsDialog(Gtk.Dialog):
         now = time.time()
         it = buf.get_end_iter()
         if not log.commits:
-            buf.insert(it, "Nothing to pull (as of the last fetch).")
+            buf.insert(it, NO_INCOMING_TEXT)
             return
         for c in log.commits:
             buf.insert_with_tags(it, c.subject + "\n", bold)
             buf.insert_with_tags(it, c.sha[:8], dim, mono)
-            when = _epoch(c.date)
+            when = commit_epoch(c.date)
             buf.insert_with_tags(it, f" · {c.author} · {ago(when, now)}\n", dim)
             if c.body:
                 buf.insert_with_tags(it, c.body + "\n", body)
             buf.insert(it, "\n")
         if log.total > len(log.commits):
-            more = log.total - len(log.commits)
-            buf.insert_with_tags(
-                it, f"… and {more} more. “Open in editor” shows all of them.\n", dim
-            )
+            buf.insert_with_tags(it, more_commits_text(log.total - len(log.commits)) + "\n", dim)
 
     def _response(self, _dialog, response) -> None:
         if response == EDITOR_RESPONSE:

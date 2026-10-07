@@ -11,6 +11,10 @@ Without a command, `repotray` starts the tray. The CLI never imports a GUI toolk
 `tray`, so every other command works over SSH or in a container. CLI commands do not take the tray's
 single-instance lock and may run while the tray runs.
 
+On Windows, `repotrayw` is the same program without a console window: use it to start the tray
+(`repotray` would keep its console window open while the tray runs). Output written to a pipe or
+file is UTF-8 there, so the table's `↑`/`↓` survive redirection.
+
 `REPO` arguments accept a display name (as shown by `scan`/`status`), a directory basename or a
 path. A path to a repository outside the configured roots works too. When a name matches several
 repositories, the candidates are listed and nothing runs (exit 2).
@@ -29,7 +33,7 @@ repositories, the candidates are listed and nothing runs (exit 2).
 | `repotray doctor` | Version, Python, platform and desktop, git, config path and warnings, roots and repository count, icon installation, autostart, log path, and every backend with its probe score (`*` = selected). | 0 |
 | `repotray config path` | Print the config file path. | 0 |
 | `repotray config default` | Print the default config (fully commented). | 0 |
-| `repotray autostart enable\|disable\|status` | Linux: `~/.config/autostart/repotray.desktop`; macOS: `~/Library/LaunchAgents/io.github.repotray.plist`; Windows: `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, value `repotray`. | 0 |
+| `repotray autostart enable\|disable\|status` | Linux: `~/.config/autostart/repotray.desktop`; macOS: `~/Library/LaunchAgents/io.github.repotray.plist`; Windows: `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, value `repotray`, which starts `repotrayw.exe tray` (no console window; `pythonw -m repotray tray` if the launcher is missing). | 0 |
 | `repotray icons install\|uninstall` | Copy the symbolic icons into `~/.local/share/icons/hicolor/scalable/status/` (Linux; the tray does this at startup anyway) or remove the ones it copied. | 0 |
 | `repotray quit` | Stop the running tray (SIGTERM to the pid in the instance lock). Not supported on Windows. | 0; 1 none running |
 

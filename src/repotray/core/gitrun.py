@@ -7,6 +7,7 @@ an editor), runs in its own process group and is killed with its children on tim
 from __future__ import annotations
 
 import contextlib
+import logging
 import os
 import re
 import shutil
@@ -18,6 +19,8 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 from typing import Protocol
+
+log = logging.getLogger(__name__)
 
 
 class CallKind(StrEnum):
@@ -64,16 +67,48 @@ NON_INTERACTIVE_ENV: Mapping[str, str] = {
 }
 
 
+SSH_QUERY_TIMEOUT = 10.0
+# ssh variants (by program name, as git tells them apart) and their "never prompt" option.
+BATCH_OPTIONS = {"plink": "-batch", "tortoiseplink": "-batch"}
+
+
+def _program_name(command: str) -> str:
+    """Lower-case basename without .exe of a shell command's program (quoted or not)."""
+    command = command.strip()
+    if command[:1] in "\"'":
+        prog = command[1:].split(command[0], 1)[0]
+    else:
+        prog = command.split(None, 1)[0] if command else ""
+    name = re.split(r"[\\/]", prog)[-1].lower()
+    return name.removesuffix(".exe")
+
+
+def batch_ssh_command(configured: str | None) -> str:
+    """GIT_SSH_COMMAND for a connection that must never prompt: the user's own ssh command
+    (``core.sshCommand``, e.g. Windows' OpenSSH so its agent is used) or plain ``ssh``, with the
+    variant's batch option added (``-oBatchMode=yes``; ``-batch`` for PuTTY's plink)."""
+    command = (configured or "").strip() or "ssh"
+    return f"{command} {BATCH_OPTIONS.get(_program_name(command), '-oBatchMode=yes')}"
+
+
+def ssh_overridden(env: Mapping[str, str]) -> bool:
+    """The user chose the ssh program through the environment; repotray leaves it alone."""
+    return "GIT_SSH_COMMAND" in env or "GIT_SSH" in env
+
+
 def git_environment(
     kind: CallKind,
     base: Mapping[str, str] | None = None,
     extra: Mapping[str, str] | None = None,
+    ssh_command: str | None = None,
 ) -> dict[str, str]:
+    """The environment of a git process. ``ssh_command`` is the repo's ``core.sshCommand``:
+    setting GIT_SSH_COMMAND would override it, so it is kept and batch mode added to it."""
     env = dict(os.environ if base is None else base)
     env.update(extra or {})
     env.update(NON_INTERACTIVE_ENV)
-    if "GIT_SSH_COMMAND" not in env:
-        env["GIT_SSH_COMMAND"] = "ssh -oBatchMode=yes"
+    if not ssh_overridden(env):
+        env["GIT_SSH_COMMAND"] = batch_ssh_command(ssh_command)
     if os.name == "posix":
         env["GIT_ASKPASS"] = "true"
         env.pop("SSH_ASKPASS", None)
@@ -152,13 +187,15 @@ class GitRunner:
         cmd = self.command(args, cwd)
         if self._closed:
             return GitResult(-1, b"", b"repotray is shutting down", False, cmd)
+        # Only fetches and actions reach a remote, so only they need the repo's ssh command.
+        ssh = self.configured_ssh(cwd) if kind in (CallKind.FETCH, CallKind.ACTION) else None
         try:
             proc = subprocess.Popen(
                 cmd,
                 stdin=subprocess.DEVNULL,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                env=git_environment(kind, extra=self.extra_env),
+                env=git_environment(kind, extra=self.extra_env, ssh_command=ssh),
                 **self.popen_kwargs(),
             )
         except FileNotFoundError:
@@ -182,6 +219,28 @@ class GitRunner:
         finally:
             with self._lock:
                 self._procs.discard(proc)
+
+    def configured_ssh(self, cwd: Path) -> str | None:
+        """The repo's effective ``core.sshCommand`` (local, global or system config), read for
+        every network call so a config change applies at once; None when unset, when the
+        environment already chooses the ssh program, or when git cannot tell."""
+        if ssh_overridden({**os.environ, **self.extra_env}):
+            return None
+        try:
+            cp = subprocess.run(
+                [self.git, "-C", str(cwd), "config", "--get", "core.sshCommand"],
+                stdin=subprocess.DEVNULL,
+                capture_output=True,
+                timeout=SSH_QUERY_TIMEOUT,
+                env=git_environment(CallKind.QUERY, extra=self.extra_env),
+                check=False,
+                **self.popen_kwargs(),
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            log.warning("reading core.sshCommand in %s failed (%s); using plain ssh", cwd, exc)
+            return None
+        value = cp.stdout.decode("utf-8", errors="replace").strip()
+        return value if cp.returncode == 0 and value else None
 
     def kill_all(self) -> None:
         """Stop accepting work and kill every running git process (shutdown)."""

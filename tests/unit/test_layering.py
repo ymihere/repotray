@@ -9,13 +9,14 @@ from pathlib import Path
 import repotray
 
 SRC = Path(repotray.__file__).parent
-BLOCKED = ("gi", "pystray", "PIL")
+BLOCKED = ("gi", "pystray", "PIL", "PySide6")
 HEADLESS = [
     "repotray.cli",
     "repotray.app",
     "repotray.icons.names",
     "repotray.icons.svg",
     "repotray.ui.placement",
+    "repotray.ui.text",
     "repotray.backends.registry",
     "repotray.backends.base",
 ]
@@ -43,7 +44,7 @@ def test_headless_imports_without_toolkits(monkeypatch):
 
 
 def test_no_toolkit_import_statements():
-    pattern = re.compile(r"^\s*(import|from)\s+(gi|pystray|PIL)\b", re.M)
+    pattern = re.compile(r"^\s*(import|from)\s+(gi|pystray|PIL|PySide6)\b", re.M)
     for mod in headless_modules():
         path = SRC.joinpath(*mod.split(".")[1:]).with_suffix(".py")
         assert not pattern.search(path.read_text("utf-8")), f"{path} imports a GUI toolkit"

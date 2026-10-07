@@ -58,7 +58,7 @@ earlier dots-only icons, zipped rows or the footer, SPEC.md wins.
 | Licence | MIT, `Copyright (c) 2026 Andreas Bonelli`. Octicons' MIT notice ships alongside the icons. |
 | Defaults | `fetch_interval = 600`, `notifications = false` (as in SPEC). |
 | Glyph | Octicon `repo` at scale 1.0, unshifted (verified in the live tray, see CLAUDE.local.md). Path data in §4.12. |
-| macOS / Windows | v1 ships the pystray backend with the **menu fallback** (`caps.panel = False`), marked *experimental, untested by the maintainer*. Native panels are the documented top porting opportunity. |
+| macOS / Windows | v1 ships the pystray backend with the **menu fallback** (`caps.panel = False`), marked *experimental, untested by the maintainer*. Native panels are the documented top porting opportunity. **Windows (2026-10-07):** the `qt` backend (PySide6, `ui/qt/`) gives the full panel and is the default there; pystray remains for macOS. |
 | Badge | No counts drawn into bitmaps (unreadable at 16 px). Where no label is supported, counts live in the tooltip and menu; dots and tint work everywhere. |
 | Panel theme | `panel_theme = "auto"`: on Cinnamon read `gsettings get org.cinnamon.theme name`; if it contains "dark" (case-insensitive) set `Gtk.Settings.get_default().props.gtk_application_prefer_dark_theme = True` for repotray's process only. Cinnamon popups follow the Cinnamon theme, GTK apps the GTK theme, and they differ on the dev machine. `dark` / `light` force; `system` leaves GTK alone. |
 | Middle click | Fetch all now (XApp button 2). |
@@ -133,10 +133,12 @@ repotray/
 │   │   ├── base.py  linux.py  macos.py  windows.py
 │   ├── backends/          tray backends behind one protocol + registry (§4.11)
 │   │   ├── base.py  registry.py  fake.py
-│   │   ├── xapp.py  appindicator.py  gtkstatusicon.py  pystray_backend.py
+│   │   ├── xapp.py  appindicator.py  gtkstatusicon.py  qt.py  pystray_backend.py
 │   ├── ui/
 │   │   ├── placement.py   pure geometry for anchoring the panel (no gi)
-│   │   └── gtk3/          panel.py  menus.py  details.py  theme.py  (shared by the Linux backends)
+│   │   ├── text.py        toolkit-free dialog texts shared by gtk3 and qt
+│   │   ├── gtk3/          panel.py  menus.py  details.py  theme.py  (shared by the Linux backends)
+│   │   └── qt/            panel.py  menus.py  dialogs.py  icons.py  widgets.py  app.py  winapi.py
 │   └── icons/
 │       ├── names.py       IconSpec → theme icon name
 │       ├── svg.py         IconSpec → full-colour SVG (hex mode), from geometry.json
@@ -154,11 +156,12 @@ repotray/
 ### 4.1 Layering
 `core` ← `platform` ← `app` ← `backends` / `ui`. Arrows mean "may import". `core` imports only the
 standard library. `platform` imports stdlib plus lazily imported OS modules (`winreg`, `fcntl`,
-`msvcrt`). Only `backends/*` and `ui/gtk3/*` import gi, pystray or Pillow, always inside the module, so
-importing the registry never imports a toolkit. A test (`tests/unit/test_layering.py`) blocks `gi`,
-`pystray` and `PIL` via `sys.modules[...] = None` and imports every module under `core`, `platform`,
-`icons/names.py`, `icons/svg.py`, `ui/placement.py`, `cli` and `app`; it also greps those files for
-`import gi`.
+`msvcrt`). Only `backends/*`, `ui/gtk3/*` and `ui/qt/*` import gi, PySide6, pystray or Pillow, always
+inside the module, so importing the registry never imports a toolkit. A test
+(`tests/unit/test_layering.py`) blocks `gi`, `pystray`, `PIL` and `PySide6` via
+`sys.modules[...] = None` and imports every module under `core`, `platform`, `icons/names.py`,
+`icons/svg.py`, `ui/placement.py`, `ui/text.py`, `cli` and `app`; it also greps those files for
+toolkit imports.
 
 ### 4.2 Core types (`core/types.py`)
 Frozen dataclasses with `slots=True`; times are `float` epoch seconds; paths are `pathlib.Path`.
@@ -229,8 +232,11 @@ stderr, timed_out, command)`; tests inject a fake runner through the same signat
   output, which the parser handles as bytes.
 - Environment = `os.environ` plus `platform.git_env()` plus, for every call:
   `GIT_TERMINAL_PROMPT=0`, `GCM_INTERACTIVE=never`, `GIT_EDITOR=true`, `GIT_SEQUENCE_EDITOR=true`,
-  `GIT_MERGE_AUTOEDIT=no`, `SSH_ASKPASS_REQUIRE=never`, and `GIT_SSH_COMMAND="ssh -oBatchMode=yes"`
-  unless the user already set `GIT_SSH_COMMAND`. POSIX adds `GIT_ASKPASS=true` (the `true` binary on
+  `GIT_MERGE_AUTOEDIT=no`, `SSH_ASKPASS_REQUIRE=never`, and `GIT_SSH_COMMAND` = the repo's
+  `core.sshCommand` (read with `git config --get` before each fetch/action; plain `ssh` when unset)
+  plus `-oBatchMode=yes` (`-batch` for plink), unless the user set `GIT_SSH_COMMAND` or `GIT_SSH`
+  (2026-10-07: replacing `core.sshCommand` with plain `ssh` would bypass e.g. Windows' OpenSSH and
+  its agent). POSIX adds `GIT_ASKPASS=true` (the `true` binary on
   PATH). Status calls add `GIT_OPTIONAL_LOCKS=0` so a status pass never writes the index.
 - Process group: POSIX `start_new_session=True`; Windows `CREATE_NEW_PROCESS_GROUP |
   CREATE_NO_WINDOW`. On timeout `platform.kill_tree(proc)`: POSIX SIGTERM to the group, SIGKILL after
@@ -326,8 +332,10 @@ changes trigger a rescan, interval changes reschedule, `[indicator]` changes re-
 | `[repo."<path>"] fetch` | bool | true | |
 | `[repo."<path>"] name` | str | — | display name override |
 
-Template commands are split with `shlex.split` (POSIX) or `str.split` (Windows) **before**
-substituting `{path}` into each argument; never run through a shell.
+Template commands are split with `shlex.split` (POSIX) or `shlex.split(posix=False)` with the
+surrounding double quotes removed from each word (Windows: backslashes literal, quoted program paths
+with spaces stay whole) **before** substituting `{path}` into each argument; never run through a
+shell.
 
 ### 4.7 Actions (`core/actions.py`)
 All actions take the per-repo lock (blocking, 30 s; else fail with "busy") and run on the fetch pool.
@@ -510,7 +518,7 @@ scheduler snapshots, builds IconSpec/label/tooltip/PanelModel/menus, and pushes 
 `backend.call_soon`. With `--demo` it uses `DemoScheduler` (same API) instead of the real scheduler.
 
 **Registry** (`registry.py`): built-ins as lazy import strings (`"xapp": "repotray.backends.xapp:XAppBackend"`,
-`appindicator`, `gtkstatusicon`, `pystray`, `fake`) plus third-party classes from
+`appindicator`, `gtkstatusicon`, `qt`, `pystray`, `fake`) plus third-party classes from
 `importlib.metadata.entry_points(group="repotray.backends")`. Selection: `--backend` >
 `REPOTRAY_BACKEND` > config `backend` > highest probe score > 0. Import errors yield score 0 with the
 exception as reason. `repotray doctor` prints every backend with score and reason.
@@ -520,6 +528,7 @@ exception as reason. `repotray doctor` prints every backend with score and reaso
 | `xapp` | Linux; `gi.require_version("XApp","1.0")` works and a bus name starting with `org.x.StatusIconMonitor.` exists → 100; XApp importable but no monitor → 30 (libxapp falls back on its own; confirm via doctor) | tooltip markup, label, panel, two menus, notifications (Notify 0.7), anchor |
 | `appindicator` | Linux; AyatanaAppIndicator3 0.1 (or AppIndicator3 0.1) importable and `org.kde.StatusNotifierWatcher` on the bus → 80 | label, panel (opened from a menu item / middle click, at the pointer), notifications; no tooltip, no anchor |
 | `gtkstatusicon` | Linux, X11 session → 20 | tooltip markup, panel, two menus, anchor via `get_geometry()`; no label |
+| `qt` | `PySide6` importable → 70 on Windows, 40 on macOS (untested), 5 on Linux | plain tooltip (127 chars on Windows), panel, two menus, notifications, anchor via `QSystemTrayIcon.geometry()`; no label |
 | `pystray` | `pystray` and `PIL` importable → 50 on macOS/Windows, 10 on Linux | plain tooltip (127 chars on Windows), one menu, no panel, no label |
 | `fake` | never auto-selected; `--backend fake` | configurable; records every call; for tests and headless runs |
 
@@ -532,6 +541,13 @@ Ignore `activate` (it fires on the same click).
 **AppIndicator specifics:** menu = fallback menu prefixed by "Open panel…"; `secondary-activate`
 (middle click) opens the panel at the pointer; label via `set_label`; hex icons via
 `set_icon_theme_path(cache_dir)` and a name without "symbolic".
+
+**Qt specifics:** `QSystemTrayIcon.activated`: `Trigger` (left) → `panel.toggle(anchor)` with the anchor
+from the icon rectangle (`ui/placement.anchor_from_icon`, shared with `gtkstatusicon`), `MiddleClick` →
+fetch all, `Context` → the control menu set with `setContextMenu`. `call_soon` emits a signal with a
+queued connection to an object on the Qt thread. Tray icon = one pixmap per size 16–64 px from
+`icons/raster.py`. The panel (`ui/qt/panel.py`) mirrors the GTK one widget for widget; dialogs in
+`ui/qt/dialogs.py`; texts shared through `ui/text.py`.
 
 **pystray specifics:** run with `icon.run(setup)`; `call_soon` enqueues and the queue is drained by a
 worker that applies updates under a lock and calls `icon.update_menu()`. Icon images from
@@ -657,7 +673,8 @@ Each milestone lists deliverables, then acceptance checks that must all pass bef
   ignored. Commit locally only; the maintainer pushes.
 - `pyproject.toml`: hatchling; `requires-python = ">=3.11"`; `dependencies = ["pystray>=0.19;
   sys_platform == 'darwin' or sys_platform == 'win32'", "Pillow>=9; sys_platform == 'darwin' or
-  sys_platform == 'win32'"]`; extras `dev = ["pytest>=8", "ruff>=0.6", "shapely>=2", "svgpathtools>=1.6",
+  sys_platform == 'win32'"]` (since 2026-10-07: `PySide6-Essentials>=6.8` instead of pystray on
+  Windows, extra `qt`, and a `repotrayw` gui-script); extras `dev = ["pytest>=8", "ruff>=0.6", "shapely>=2", "svgpathtools>=1.6",
   "build", "twine"]`, `pystray = ["pystray>=0.19", "Pillow>=9"]`; `[project.scripts] repotray =
   "repotray.cli:main"`; package data includes `icons/data/**` and `default_config.toml`; classifiers;
   URLs (§1); ruff (line length 100, rules E F W I UP B SIM); pytest markers `integration`, `gui`,

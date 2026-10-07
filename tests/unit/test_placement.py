@@ -1,6 +1,13 @@
 import pytest
 
-from repotray.ui.placement import Anchor, Rect, monitor_for, place, side_from_position
+from repotray.ui.placement import (
+    Anchor,
+    Rect,
+    anchor_from_icon,
+    monitor_for,
+    place,
+    side_from_position,
+)
 
 # Primary 2560x1440 at x=1920 with a 40 px bottom panel; a laptop to the left; one to the right.
 PRIMARY = (Rect(1920, 0, 2560, 1440), Rect(1920, 0, 2560, 1400))
@@ -67,3 +74,29 @@ def test_monitor_selection_with_offsets():
 def test_side_from_gtk_position():
     assert [side_from_position(i) for i in range(4)] == ["left", "right", "top", "bottom"]
     assert side_from_position(9) is None
+
+
+# --- anchor_from_icon: hosts that report the icon rectangle but not the panel side --------------
+
+MONITOR = Rect(0, 0, 1920, 1200)
+
+
+def test_icon_in_bottom_bar():
+    # Measured on Windows 11 (Qt's QSystemTrayIcon.geometry(), icon in the overflow chevron).
+    assert anchor_from_icon(Rect(1626, 1152, 32, 48), MONITOR) == Anchor(1630, 1152, "bottom")
+
+
+def test_icon_in_top_left_and_right_bars():
+    assert anchor_from_icon(Rect(900, 0, 24, 24), MONITOR) == Anchor(900, 24, "top")
+    assert anchor_from_icon(Rect(0, 300, 40, 24), MONITOR) == Anchor(40, 300, "left")
+    assert anchor_from_icon(Rect(1890, 300, 30, 24), MONITOR) == Anchor(1890, 300, "right")
+
+
+def test_icon_position_unclear_opens_at_the_icon():
+    # Tall rectangle in the upper half: no bar can be inferred.
+    assert anchor_from_icon(Rect(900, 100, 24, 400), MONITOR).side is None
+
+
+def test_anchor_from_icon_on_a_second_monitor():
+    a = anchor_from_icon(Rect(4000, 1400, 24, 40), PRIMARY[0])
+    assert a == Anchor(4000, 1400, "bottom")
