@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import html
-from pathlib import Path
 
 from repotray.core.config import Config
 from repotray.core.indicator import counts
@@ -127,11 +126,3 @@ def _summary_line(snapshot: Snapshot, config: Config, now: float, limit: int) ->
     if len(text) > limit:
         text = text[: max(0, limit - 1)] + "…"
     return text
-
-
-def abbreviate(path: Path) -> str:
-    home = Path.home()
-    try:
-        return "~/" + str(path.relative_to(home))
-    except ValueError:
-        return str(path)

@@ -73,6 +73,7 @@ Format: date — question → choice (reason).
   inferred from where the icon sits on its monitor.
 - 2026-10-07 — CI on Windows skips the real-git integration tests and the symlink/permission/
   shebang unit tests (POSIX fixtures); Windows is covered by the unit tests with mocks only.
+  *Superseded the same day:* the integration tests run on Windows too (see "Windows: Qt backend").
 - 2026-10-07 — `install.sh` installs only for the current user, never with sudo; it writes a
   `~/.local/share/applications/repotray.desktop` menu entry besides the launcher. `uninstall.sh`
   removes manifest-listed paths only when they are under `$HOME`, then removes directories it may
@@ -133,6 +134,66 @@ Format: date — question → choice (reason).
   (uncommitted changes on a diverged branch, operation in progress, busy) it is disabled and the
   reason is printed under the dialog's heading, because insensitive buttons may hide tooltips.
 
+### Windows: Qt backend (2026-10-07)
+
+The maintainer asked for the panel on Windows ("apps like Keybase and Dropbox show rich UI on left
+click"). Done on a Windows 11 machine (Python 3.13, Git 2.45, PySide6 6.11).
+
+- Toolkit: **Qt 6 via PySide6** (`backends/qt.py`, `ui/qt/`), not Tk. `QSystemTrayIcon` reports
+  left/middle/right clicks and the icon rectangle, so one toolkit covers icon, panel, menus,
+  dialogs and notifications. Tk would have needed pystray for the icon (no left click, no icon
+  position) plus Win32 calls, and two event loops. Cost: `PySide6-Essentials` (73 MB wheel on
+  Windows, checked on PyPI) replaces pystray as the Windows dependency; pystray stays for macOS and
+  as the `pystray` extra. Minimum PySide6 6.8 (`QStyleHints.setColorScheme`).
+- Probe scores: `qt` 70 on Windows (beats pystray's 50), 40 on macOS (untested there, below
+  pystray), 5 on Linux (the GTK backends match Cinnamon; Qt would show pixmaps).
+- The Qt panel copies the GTK panel widget for widget (same grid columns, sections, rebuild rules,
+  300 ms reopen guard, 2 s refresh tick, dialogs that keep the panel open). Toolkit-free texts moved
+  to `ui/text.py` (details text, commit date parsing, dialog strings) and the icon-side inference of
+  `gtkstatusicon` to `ui/placement.anchor_from_icon`, so neither is duplicated.
+- Window: frameless `Qt.Tool` + stay-on-top; Windows 11 rounds its corners and adds the flyout
+  shadow through `DwmSetWindowAttribute(DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND)`. Windows 10
+  ignores the call (square corners).
+- Theme: `panel_theme = "auto"` follows `SystemUsesLightTheme` (the taskbar), like Windows' own tray
+  flyouts, via `QStyleHints.setColorScheme`; Qt's `windows11` style draws both schemes.
+- Icons: the model's GTK icon names map to Segoe Fluent Icons / Segoe MDL2 Assets glyphs, painted
+  in the palette's text colour by a small `QIconEngine` (Qt's own theme icons have no gear);
+  freedesktop theme names elsewhere, a text arrow as last resort (Qt's offscreen platform has no
+  icon font, so the tests see the text). Banner colours are WinUI's InfoBar critical/success
+  colours, light and dark — Windows has no theme colour for errors.
+- Tray icon: one pixmap per size 16, 20, 24, 32, 40, 48, 64 px from `icons/raster.py`, so Windows
+  never shrinks a 64 px bitmap to 16 px (checked on a contact sheet on light and dark taskbars).
+- Sizing: Qt computes nested layouts lazily, so `adjustSize()` right after a model change used
+  stale sizes and squeezed rows over the groups (seen in the first render). `Panel.fit()` delivers
+  pending `LayoutRequest`s first; the window is re-placed on every resize so it stays flush with the
+  taskbar when rows come and go.
+- Focus: the panel closes when it loses activation (60 ms re-check, unless a menu or one of its
+  dialogs is open). If Windows' foreground lock refuses to activate it, it asks once with
+  `AttachThreadInput` + `SetForegroundWindow` — only if it never had focus since being shown (a
+  first version also did it after the user had clicked elsewhere and stole focus back; a test
+  caught it).
+- Clicks: `Trigger` toggles the panel, `MiddleClick` fetches, `Context` shows the control menu.
+  With the icon in the hidden-icons overflow, `QSystemTrayIcon.geometry()` reports the `^` button
+  (measured: `QRect(1626, 1152, 32, 48)` on a 1920×1200 screen), so the panel opens above it.
+- `call_soon` emits a signal with an explicit queued connection, so even a call from the Qt thread
+  runs later, never re-entrantly (GLib's `idle_add` behaves the same).
+- Windows fixes found on the way: (1) `GIT_SSH_COMMAND="ssh -oBatchMode=yes"` overrode
+  `core.sshCommand` (the maintainer's is `C:/Windows/System32/OpenSSH/ssh.exe`) and `GIT_SSH`; now
+  the repo's `core.sshCommand` is read before each fetch/action (≈ 50 ms measured on Windows) and
+  batch mode appended (`-batch` for plink). (2) CLI output to a pipe crashed on `↑` (cp1252); the
+  CLI writes UTF-8 on Windows. (3) `cmd /K` was started with git's `CREATE_NO_WINDOW` — invisible;
+  helpers now get `CREATE_NEW_CONSOLE` (`wt.exe` is a GUI program, checked, so it is unaffected).
+  (4) Windows templates were split on spaces, breaking quoted program paths. (5) Autostart ran
+  `repotray.exe` (a console window at login); it now uses the new `repotrayw` gui-script.
+  (6) Paths showed as `~/code\x`: the `~` helper existed four times (cli, scanner, model, and an
+  unused one in tooltip); now one `core.config.abbreviate` with the OS separator.
+- The real-git integration tests run on Windows (all 28 pass, including the pre-receive hook
+  test: Git for Windows runs `#!/bin/sh` hooks without chmod).
+- Verified on Windows 11: unit + integration tests; the Qt panel tests and the conformance suite
+  both offscreen and on the real desktop (`REPOTRAY_GUI_TESTS=1`); a live `--demo` run that opened
+  the panel above the tray (screenshot: flush with the taskbar, rounded corners, light theme).
+  Not verified by a person yet: a real mouse click on the tray icon.
+
 ## Blocked / unverified
 - 2026-10-07 — **Live tray screenshots (M2, M3) while the session is locked.** The maintainer's
   screen locked during the run (cinnamon-screensaver active); root-window captures then show only
@@ -145,6 +206,7 @@ Format: date — question → choice (reason).
   click first moves focus to the panel applet, which the 300 ms reopen guard handles (unit-tested,
   not observed live).
 - macOS and Windows platforms and the pystray backend there were only unit-tested with mocks.
+  (Windows: tested on a real machine since 2026-10-07, see above; macOS still mocks only.)
 - `shellcheck` is not installed on the dev machine; the scripts were checked with `bash -n`/`sh -n`
   and an install → reinstall → uninstall round trip into a temporary `HOME`.
 - The GitHub workflows have never run (nothing is pushed); YAML was validated locally.

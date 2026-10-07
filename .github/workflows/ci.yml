@@ -42,5 +42,10 @@ jobs:
         run: |
           git config --global user.name "CI"
           git config --global user.email "ci@example.invalid"
-      - name: Test (GUI tests off)
+      - name: Test (GTK GUI tests off; Qt tests offscreen where PySide6 is installed)
         run: python -m pytest -q
+      - name: Conformance of the qt backend (offscreen)
+        if: runner.os == 'Windows'
+        env:
+          REPOTRAY_BACKEND: qt
+        run: python -m pytest -q tests/conformance

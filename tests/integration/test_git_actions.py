@@ -22,11 +22,7 @@ from repotray.core.gitstatus import check_status, fetch_repo
 from repotray.core.scanner import scan
 from repotray.core.types import ActionKind
 
-pytestmark = [
-    pytest.mark.integration,
-    # Hooks, chmod and TCP fixtures assume POSIX; Windows coverage is unit tests only for now.
-    pytest.mark.skipif(sys.platform == "win32", reason="POSIX-only fixtures"),
-]
+pytestmark = pytest.mark.integration
 
 
 def info_for(path: Path):
@@ -330,7 +326,7 @@ def cli(*args, config: Path, check_code: int | None = None):
     cp = subprocess.run(
         [sys.executable, "-m", "repotray", "--config", str(config), *args],
         capture_output=True,
-        text=True,
+        encoding="utf-8",  # what the CLI writes to a pipe on every OS (↑ ↓ in the table)
         timeout=60,
         stdin=subprocess.DEVNULL,
     )
@@ -484,3 +480,25 @@ def test_incoming_commits(pair):
     assert len(incoming_commits(GitRunner(), mine, limit=1).commits) == 1
     git(mine, "checkout", "-q", "-b", "local-only")
     assert incoming_commits(GitRunner(), mine).error  # no upstream
+
+
+def test_fetch_uses_configured_ssh_command_with_batch_mode(pair, tmp_path, monkeypatch):
+    """core.sshCommand (e.g. Windows' OpenSSH, whose agent holds the keys) stays in use; repotray
+    only adds batch mode so ssh can never wait for a password."""
+    monkeypatch.delenv("GIT_SSH_COMMAND", raising=False)
+    monkeypatch.delenv("GIT_SSH", raising=False)
+    _, mine, _ = pair
+    record = tmp_path / "ssh-args.json"
+    fake = tmp_path / "fake_ssh.py"
+    fake.write_text(
+        "import json, sys\n"
+        f"open({str(record)!r}, 'w').write(json.dumps(sys.argv[1:]))\n"
+        "sys.exit(255)\n"
+    )
+    ssh = f'"{Path(sys.executable).as_posix()}" "{fake.as_posix()}"'
+    git(mine, "config", "core.sshCommand", ssh)
+    git(mine, "remote", "set-url", "origin", "ssh://git@example.invalid/x.git")
+    res = fetch_repo(GitRunner(), mine, 30)
+    assert not res.ok
+    args = json.loads(record.read_text())
+    assert args[0] == "-oBatchMode=yes" and "example.invalid" in " ".join(args)

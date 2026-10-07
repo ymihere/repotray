@@ -17,7 +17,7 @@ from repotray.core.actions import (
     push_block_reason,
     sync_block_reason,
 )
-from repotray.core.config import Config
+from repotray.core.config import Config, abbreviate
 from repotray.core.indicator import counts
 from repotray.core.types import ActionKind, ActionResult, FetchMode, RepoState, Snapshot
 
@@ -197,16 +197,8 @@ def minutes_until(t: float | None, now: float) -> str:
     return f"in {round(d / 60)} min"
 
 
-def _abbrev(path: Path) -> str:
-    home = Path.home()
-    try:
-        return "~/" + str(path.relative_to(home))
-    except ValueError:
-        return str(path)
-
-
 def repo_tooltip(s: RepoState, config: Config) -> str:
-    lines = [_abbrev(s.path)]
+    lines = [abbreviate(s.path)]
     if s.detached:
         lines.append("HEAD detached")
     elif s.branch:
@@ -410,7 +402,7 @@ def build_groups(snapshot: Snapshot, config: Config) -> tuple[Group, ...]:
                 "fetch_failed",
                 f"Fetch failed ({len(failed)})",
                 ICON_WARNING,
-                chips(failed, lambda s: f"{s.fetch_error}\n{_abbrev(s.path)}"),
+                chips(failed, lambda s: f"{s.fetch_error}\n{abbreviate(s.path)}"),
             )
         )
     broken = [s for s in repos if s.status_error]
@@ -420,7 +412,7 @@ def build_groups(snapshot: Snapshot, config: Config) -> tuple[Group, ...]:
                 "status_failed",
                 f"Unreadable ({len(broken)})",
                 ICON_WARNING,
-                chips(broken, lambda s: f"{s.status_error}\n{_abbrev(s.path)}"),
+                chips(broken, lambda s: f"{s.status_error}\n{abbreviate(s.path)}"),
             )
         )
     clean = [

@@ -19,11 +19,26 @@ All notable changes to this project are documented here. The format follows
   alternative.
 
 ### Added
+- **Windows: the panel.** New `qt` backend (Qt 6 via PySide6, now a Windows dependency instead
+  of pystray): left click opens the same panel as on Linux above the tray icon, right click the
+  control menu, middle click fetches; incoming-commits and details dialogs; follows the taskbar's
+  dark/light setting; tray icon drawn for every size from 16 to 64 px.
+- `repotrayw`: starts the tray without a console window on Windows; autostart uses it.
 - *Push all* and *Pull all* buttons next to *Sync all*, at the top of the panel, in the fallback
   menu, and as `repotray push --all` / `repotray pull --all`.
 - *Show incoming commits…* in a repository's menu: the commit messages a pull would bring, with
   *Open in editor* for the full log and a *Pull* button (*Sync* for diverged branches). New
   `editor` setting (default: the desktop's text editor), also used by *Open config file*.
+
+### Fixed
+- ssh remotes now use the repository's `core.sshCommand` (e.g. Windows' OpenSSH and its agent)
+  with batch mode added; repotray used to replace it with plain `ssh`. `GIT_SSH` is respected.
+- Windows: `repotray status`/`fetch`/`config default` no longer crash when their output goes to a
+  pipe or file (UTF-8 instead of the ANSI code page).
+- Windows: *Open terminal here* without Windows Terminal opened `cmd` hidden; it gets a window now.
+- Windows: `terminal`/`file_manager`/`editor` templates keep a quoted program path with spaces.
+- Windows: autostart no longer opens a console window at login.
+- Windows: paths are shown as `~\code\x` instead of `~/code\x`.
 
 ## [0.1.0] — unreleased
 

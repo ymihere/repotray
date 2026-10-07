@@ -57,20 +57,11 @@ class PystrayBackend:
         )
 
     # --- rendering ---
-    def _glyph_color(self) -> str:
-        try:
-            dark = self.platform.prefers_dark_panel()
-        except Exception:  # noqa: BLE001
-            dark = None
-        if dark is None:
-            dark = sys.platform != "darwin"  # Windows' default taskbar is dark
-        return "#e1e1e1" if dark else "#1e1e1e"
-
     def _image(self, spec):
         from repotray.core.indicator import IconSpec
-        from repotray.icons.raster import render
+        from repotray.icons.raster import bar_glyph_color, render
 
-        return render(spec or IconSpec(), ICON_PX, glyph_color=self._glyph_color())
+        return render(spec or IconSpec(), ICON_PX, glyph_color=bar_glyph_color(self.platform))
 
     def _menu_items(self):
         with self._lock:

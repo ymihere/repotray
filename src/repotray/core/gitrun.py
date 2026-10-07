@@ -7,17 +7,21 @@ an editor), runs in its own process group and is killed with its children on tim
 from __future__ import annotations
 
 import contextlib
+import logging
 import os
 import re
 import shutil
 import signal
 import subprocess
 import threading
+import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 from typing import Protocol
+
+log = logging.getLogger(__name__)
 
 
 class CallKind(StrEnum):
@@ -64,16 +68,48 @@ NON_INTERACTIVE_ENV: Mapping[str, str] = {
 }
 
 
+SSH_QUERY_TIMEOUT = 10.0
+# ssh variants (by program name, as git tells them apart) and their "never prompt" option.
+BATCH_OPTIONS = {"plink": "-batch", "tortoiseplink": "-batch"}
+
+
+def _program_name(command: str) -> str:
+    """Lower-case basename without .exe of a shell command's program (quoted or not)."""
+    command = command.strip()
+    if command[:1] in "\"'":
+        prog = command[1:].split(command[0], 1)[0]
+    else:
+        prog = command.split(None, 1)[0] if command else ""
+    name = re.split(r"[\\/]", prog)[-1].lower()
+    return name.removesuffix(".exe")
+
+
+def batch_ssh_command(configured: str | None) -> str:
+    """GIT_SSH_COMMAND for a connection that must never prompt: the user's own ssh command
+    (``core.sshCommand``, e.g. Windows' OpenSSH so its agent is used) or plain ``ssh``, with the
+    variant's batch option added (``-oBatchMode=yes``; ``-batch`` for PuTTY's plink)."""
+    command = (configured or "").strip() or "ssh"
+    return f"{command} {BATCH_OPTIONS.get(_program_name(command), '-oBatchMode=yes')}"
+
+
+def ssh_overridden(env: Mapping[str, str]) -> bool:
+    """The user chose the ssh program through the environment; repotray leaves it alone."""
+    return "GIT_SSH_COMMAND" in env or "GIT_SSH" in env
+
+
 def git_environment(
     kind: CallKind,
     base: Mapping[str, str] | None = None,
     extra: Mapping[str, str] | None = None,
+    ssh_command: str | None = None,
 ) -> dict[str, str]:
+    """The environment of a git process. ``ssh_command`` is the repo's ``core.sshCommand``:
+    setting GIT_SSH_COMMAND would override it, so it is kept and batch mode added to it."""
     env = dict(os.environ if base is None else base)
     env.update(extra or {})
     env.update(NON_INTERACTIVE_ENV)
-    if "GIT_SSH_COMMAND" not in env:
-        env["GIT_SSH_COMMAND"] = "ssh -oBatchMode=yes"
+    if not ssh_overridden(env):
+        env["GIT_SSH_COMMAND"] = batch_ssh_command(ssh_command)
     if os.name == "posix":
         env["GIT_ASKPASS"] = "true"
         env.pop("SSH_ASKPASS", None)
@@ -152,13 +188,34 @@ class GitRunner:
         cmd = self.command(args, cwd)
         if self._closed:
             return GitResult(-1, b"", b"repotray is shutting down", False, cmd)
+        ssh = None
+        remaining = timeout
+        # Only fetches and actions reach a remote, so only they need the repo's ssh command.
+        # Reading it is part of the call: it spends the same time budget, so a hanging git
+        # still ends the whole call after ``timeout``.
+        if kind in (CallKind.FETCH, CallKind.ACTION):
+            start = time.monotonic()
+            ssh = self.configured_ssh(cwd, min(SSH_QUERY_TIMEOUT, timeout))
+            remaining = timeout - (time.monotonic() - start)
+            if remaining <= 0:
+                return GitResult(-9, b"", self._timed_out(timeout), True, cmd)
+        env = git_environment(kind, extra=self.extra_env, ssh_command=ssh)
+        return self._run(cmd, env, remaining, timeout)
+
+    @staticmethod
+    def _timed_out(timeout: float) -> bytes:
+        return f"timed out after {timeout:g} s".encode()
+
+    def _run(
+        self, cmd: tuple[str, ...], env: dict[str, str], remaining: float, timeout: float
+    ) -> GitResult:
         try:
             proc = subprocess.Popen(
                 cmd,
                 stdin=subprocess.DEVNULL,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                env=git_environment(kind, extra=self.extra_env),
+                env=env,
                 **self.popen_kwargs(),
             )
         except FileNotFoundError:
@@ -168,7 +225,7 @@ class GitRunner:
         with self._lock:
             self._procs.add(proc)
         try:
-            out, err = proc.communicate(timeout=timeout)
+            out, err = proc.communicate(timeout=remaining)
             return GitResult(proc.returncode, out, err, False, cmd)
         except subprocess.TimeoutExpired:
             self.kill_tree(proc)
@@ -177,11 +234,25 @@ class GitRunner:
             except subprocess.TimeoutExpired:
                 proc.kill()
                 out, err = proc.communicate()
-            msg = f"timed out after {timeout:g} s".encode()
-            return GitResult(-9, out, (err + b"\n" + msg).strip(), True, cmd)
+            return GitResult(-9, out, (err + b"\n" + self._timed_out(timeout)).strip(), True, cmd)
         finally:
             with self._lock:
                 self._procs.discard(proc)
+
+    def configured_ssh(self, cwd: Path, timeout: float = SSH_QUERY_TIMEOUT) -> str | None:
+        """The repo's effective ``core.sshCommand`` (local, global or system config), read for
+        every network call so a config change applies at once; None when unset, when the
+        environment already chooses the ssh program, or when git cannot tell. Runs like any
+        git call (process group, killed with its children on timeout, stopped by kill_all)."""
+        if ssh_overridden({**os.environ, **self.extra_env}):
+            return None
+        res = self(["config", "--get", "core.sshCommand"], cwd, timeout, kind=CallKind.QUERY)
+        # 1 = not set. git missing (127) and shutdown (-1) are reported by the call itself.
+        if res.timed_out or res.returncode not in (0, 1, 127, -1):
+            log.warning("reading core.sshCommand in %s failed: %s", cwd, res.err.strip())
+            return None
+        value = res.out.strip()
+        return value if res.returncode == 0 and value else None
 
     def kill_all(self) -> None:
         """Stop accepting work and kill every running git process (shutdown)."""

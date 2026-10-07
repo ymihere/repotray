@@ -20,7 +20,7 @@ body:
     id: backend
     attributes:
       label: Backend used
-      placeholder: xapp / appindicator / gtkstatusicon / pystray / a plugin
+      placeholder: xapp / appindicator / gtkstatusicon / qt / pystray / a plugin
     validations:
       required: true
   - type: textarea

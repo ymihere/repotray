@@ -1,6 +1,7 @@
 """Backend conformance suite. ``REPOTRAY_BACKEND`` selects the backend under test (default fake).
 
     REPOTRAY_BACKEND=xapp REPOTRAY_GUI_TESTS=1 pytest tests/conformance
+    REPOTRAY_BACKEND=qt pytest tests/conformance     # offscreen; REPOTRAY_GUI_TESTS=1 for real
 
 Every backend must accept every IconSpec, labels, tooltips and nested menus; ``call_soon`` from
 another thread must run on the UI thread; ``quit()`` must make ``run()`` return within 2 s.
@@ -27,7 +28,9 @@ pytestmark = pytest.mark.conformance
 NAME = (
     os.environ.get("REPOTRAY_CONFORMANCE_BACKEND") or os.environ.get("REPOTRAY_BACKEND") or "fake"
 )
-NEEDS_DISPLAY = NAME not in ("fake",)
+# Qt needs no display: tests/conftest.py puts it on its offscreen platform.
+QT_OFFSCREEN = NAME == "qt" and os.environ.get("QT_QPA_PLATFORM") == "offscreen"
+NEEDS_DISPLAY = NAME != "fake" and not QT_OFFSCREEN
 
 
 class StubController:
@@ -82,6 +85,14 @@ _KEEP: list = []
 
 def _flush() -> None:
     if NAME == "fake":
+        return
+    if NAME == "qt":
+        from PySide6.QtWidgets import QApplication
+
+        deadline = time.monotonic() + 0.3
+        while time.monotonic() < deadline:
+            QApplication.processEvents()
+            time.sleep(0.02)
         return
     from gi.repository import GLib
 

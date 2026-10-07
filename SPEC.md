@@ -210,7 +210,9 @@ second click on the icon. Updates live from every snapshot while open. Keyboard:
 between buttons, Enter activates. One instance; opening it never blocks a running
 pass. On Cinnamon it is anchored to the icon rectangle and panel side that the XApp
 applet reports (§7): centred on the icon, flush with the panel edge, clamped to the
-monitor work area. Backends without that information open it at the pointer.
+monitor work area. On Windows the icon rectangle comes from Qt (when the icon sits in the
+hidden-icons overflow, Windows reports the `^` button) and the taskbar side is inferred from
+where it is on its monitor. Backends without that information open it at the pointer.
 
 ## 3. Discovery (scan)
 - Walk each configured root to `max_depth` (default 4).
@@ -324,7 +326,7 @@ terminal = ""                      # e.g. "terminator --working-directory={path}
 file_manager = ""                  # Linux xdg-open, macOS open, Windows explorer
 editor = ""                        # config file, incoming commits; "" = desktop's text editor
 
-backend = "auto"                   # or xapp | appindicator | gtkstatusicon | pystray | a plugin
+backend = "auto"                   # or xapp | appindicator | gtkstatusicon | qt | pystray | a plugin
 panel_theme = "auto"               # auto | dark | light | system
 log_level = "info"
 
@@ -426,7 +428,17 @@ green); the dots are drawn into the image.
 ### Windows
 Light-gray glyph on transparent for the default dark taskbar; read
 `HKCU\...\Personalize\SystemUsesLightTheme` and switch to a dark glyph on light
-taskbars. Dots and tint are drawn into the image; counts live in the tooltip.
+taskbars. Dots and tint are drawn into the image, rendered at every size the taskbar
+may ask for (16–64 px) rather than scaled from one bitmap; counts live in the tooltip
+and the panel (tray icons have no label on Windows).
+
+The panel (`qt` backend, decided 2026-10-07) is the same panel in Qt 6: a frameless
+window flush with the taskbar above the icon, with Windows 11's rounded corners and
+shadow. With `panel_theme = "auto"` it follows the taskbar's dark/light setting, like
+Windows' own tray flyouts. Its icons are glyphs of the system icon font (Segoe Fluent
+Icons; Segoe MDL2 Assets on Windows 10) in the palette's text colour. Windows has no
+theme colour for errors, so the result banner uses WinUI's InfoBar colours (critical,
+success) in a light and a dark variant.
 
 ### Panel and menu icons
 Buttons use theme icons by name, so they follow the GTK theme like the rest of the
@@ -469,10 +481,10 @@ The authoritative module layout, data types and interfaces are in PLAN §3–§4
   Linux, macOS and Windows implementations.
 - **backends**: one `TrayBackend` protocol with declared `Capabilities`, a registry that
   probes and scores the available backends, and the built-ins `xapp`, `appindicator`,
-  `gtkstatusicon`, `pystray` and `fake`. Third parties add backends as separate packages
+  `gtkstatusicon`, `qt`, `pystray` and `fake`. Third parties add backends as separate packages
   through the `repotray.backends` entry point, without touching the core.
-- **ui/gtk3**: the panel, shared by the Linux backends. A backend without a panel gets
-  the same content as a menu.
+- **ui/gtk3**: the panel, shared by the Linux backends; **ui/qt**: the same panel in Qt 6 for
+  the `qt` backend (Windows). A backend without a panel gets the same content as a menu.
 - **app**: the `Controller`, the only API a UI calls (fetch, push, pull, sync, sync all,
   pause, open terminal, …).
 
@@ -494,12 +506,16 @@ take keyboard focus; exact type hint settled in M2.
 `concurrent.futures`). Rationale: PyGObject with XApp and AppIndicator typelibs is
 already present on the Mint dev machine (verified), it is the fastest path to a
 native Cinnamon result, and the core is trivially portable. XApp-1.0 binds to Gtk 3,
-so the panel is Gtk 3 everywhere on Linux. macOS/Windows: `pystray` + `Pillow` give
-the icon and the menu fallback only, since pystray cannot host a panel; v1 ships that
-(§11), and native panels (PyObjC `NSPopover`, a frameless Tk or Qt window) are left to
-contributors. Distribution: `scripts/install.sh` on Linux (needs no pip), `pipx install
---system-site-packages repotray` once on PyPI, PyInstaller bundles for macOS/Windows
-later.
+so the panel is Gtk 3 everywhere on Linux. Windows: Qt 6 via PySide6 (`qt` backend):
+`QSystemTrayIcon` reports left, middle and right clicks and the icon's rectangle, so the
+panel opens anchored to the icon like on Cinnamon; pystray, which reports neither, could
+only offer the menu fallback (decided 2026-10-07, chosen over a Tk window, which would
+have needed pystray for the icon plus Win32 calls to find it). macOS: `pystray` +
+`Pillow` give the icon and the menu fallback; the `qt` backend may work there but is
+untested, and a native panel (PyObjC `NSPopover`) is left to contributors.
+Distribution: `scripts/install.sh` on Linux (needs no pip), `pip`/`pipx install` on
+Windows (`repotrayw` starts the tray without a console window), `pipx install
+--system-site-packages repotray` once on PyPI, PyInstaller bundles later.
 
 *Alternative considered:* Go (`fyne.io/systray`) or Rust (`tray-icon`, `ksni`) for a
 single static binary. Rejected for v1 because those libraries pass pixmap icons on
@@ -572,8 +588,9 @@ All settled on 2026-10-05; details in PLAN §1.
 - Icon: Octicon `repo`, verified in the tray. Not the GitHub mark, not the Octocat
   silhouette without its circle.
 - Defaults `fetch_interval = 600` and `notifications = false` stay.
-- macOS/Windows ship with the pystray menu fallback in v1, marked experimental; native
-  panels there are the top porting opportunity.
+- macOS ships with the pystray menu fallback, marked experimental; a native panel there is
+  the top porting opportunity. Windows has the full panel through the `qt` backend
+  (2026-10-07; it replaced the pystray menu fallback there).
 - Licence MIT.
 
 ## 12. Milestones

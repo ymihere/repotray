@@ -14,15 +14,25 @@ The venv needs `--system-site-packages` because PyGObject (`gi`) and its typelib
 system (`python3-gi`, `gir1.2-xapp-1.0`, `gir1.2-ayatanaappindicator3-0.1`, `gir1.2-notify-0.7`).
 The script works without a system pip.
 
+On Windows (PowerShell, Python ≥ 3.11 and Git for Windows installed):
+
+```powershell
+py -m venv .venv
+.\.venv\Scripts\python -m pip install -e ".[dev]" pystray   # PySide6 comes with the package
+```
+
 ## Tests
 
 ```sh
 pytest -q                                    # unit + integration (real git in temp dirs)
 REPOTRAY_GUI_TESTS=1 pytest -q               # also the GTK panel tests (needs a display)
 REPOTRAY_BACKEND=xapp REPOTRAY_GUI_TESTS=1 pytest tests/conformance   # a real backend
+REPOTRAY_BACKEND=qt pytest tests/conformance # the Qt backend, offscreen
 ```
 
 Markers: `integration` (spawns git), `gui` (needs a display), `conformance` (backend suite).
+The Qt panel tests (`tests/gui/test_qt_panel.py`) run whenever PySide6 is installed, on Qt's
+offscreen platform; `REPOTRAY_GUI_TESTS=1` runs them on the real desktop instead.
 Tests isolate git (`GIT_CONFIG_GLOBAL`, `GIT_CONFIG_NOSYSTEM`) and the XDG directories; they never
 touch your repositories or config.
 
@@ -40,6 +50,8 @@ Verify UI changes by looking at them, not just by running them:
   repositories you care about.
 - `scripts/dev/render-panel.py -o panel.png [--state busy|error|success|empty|paused|syncall]
   [--theme light]` — renders the panel offscreen.
+- `scripts/dev/render-panel-qt.py OUT_DIR` — the Qt panel (light, dark, error) and the
+  incoming-commits dialog as PNGs.
 - `scripts/dev/screenshot.py tray` — the panel's tray strip, scaled ×3 (X11).
 - `scripts/dev/click-tray.sh 1|2|3` — simulates a click on the XApp icon over D-Bus.
 - `scripts/dev/preview-icons.py` — contact sheet of every icon variant on dark and light panels.

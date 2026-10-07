@@ -105,6 +105,18 @@ def expand(path: str) -> Path:
     return Path(os.path.expandvars(os.path.expanduser(path)))
 
 
+def abbreviate(path: Path) -> str:
+    """``path`` for display, the home directory written as ``~`` (``~/code/x``; on Windows
+    ``~\\code\\x``, one kind of slash)."""
+    home = Path.home()
+    if path == home:
+        return "~"
+    try:
+        return "~" + os.sep + str(path.relative_to(home))
+    except ValueError:
+        return str(path)
+
+
 # key -> (kind, validator description). Kinds: int ranges, bool, str choices, list[str].
 _INT_RANGES: dict[str, tuple[int, int | None]] = {
     "max_depth": (0, 12),

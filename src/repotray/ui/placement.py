@@ -44,6 +44,23 @@ def side_from_position(pos: int) -> str | None:
     return SIDES.get(pos)
 
 
+def anchor_from_icon(area: Rect, monitor: Rect) -> Anchor:
+    """Anchor for a tray icon at ``area`` on ``monitor`` (its full geometry), for hosts that give
+    the icon rectangle but not the panel side (Gtk.StatusIcon, Qt's QSystemTrayIcon): an icon in
+    the lower half sits in a bottom bar; a short one near the top in a top, left or right bar."""
+    cx = area.x + area.w // 2 - ICON_HALF
+    cy = area.y + area.h // 2 - ICON_HALF
+    if area.y > monitor.y + monitor.h // 2:
+        return Anchor(cx, area.y, "bottom")
+    if area.bottom < monitor.y + monitor.h // 2 and area.h < monitor.h // 4:
+        if area.x < monitor.x + monitor.w // 8:
+            return Anchor(area.right, cy, "left")
+        if area.x > monitor.x + monitor.w * 7 // 8:
+            return Anchor(area.x, cy, "right")
+        return Anchor(cx, area.bottom, "top")
+    return Anchor(cx, area.y, None)
+
+
 def _clamp(v: int, lo: int, hi: int) -> int:
     return max(lo, min(v, hi)) if hi >= lo else lo
 

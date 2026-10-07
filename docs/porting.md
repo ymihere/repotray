@@ -4,8 +4,10 @@ repotray's core knows nothing about desktops. A port means implementing a **tray
 icon, menus and panel are shown) and/or a **platform** (OS services), then running the conformance
 suite and filing a platform report. You never need to touch `repotray/core/`.
 
-The most wanted ports: a native panel on macOS (`NSPopover` via PyObjC) and Windows (a frameless
-Tk or Qt window), and status-item titles (counts next to the icon) on macOS.
+The most wanted ports: a panel on macOS — try the `qt` backend there first (`pip install
+"repotray[qt]"`, `--backend qt`; written for Windows, untested on macOS), else `NSPopover` via
+PyObjC — and status-item titles (counts next to the icon) on macOS. Windows has the full panel
+through the `qt` backend.
 
 ## Try it without your repositories
 
@@ -69,7 +71,8 @@ always opens a menu: the menu then starts with *Open panel…*).
 - `MenuItem(label, action, enabled, checked, children, separator, path, tooltip)`. When the user
   activates an item, call `controller.dispatch(item.action, item.path)` — on the UI thread.
 - `PanelModel`: everything the panel shows, as plain data (see `repotray/core/model.py`). The GTK
-  implementation in `repotray/ui/gtk3/panel.py` is the reference layout.
+  implementation in `repotray/ui/gtk3/panel.py` is the reference layout; `repotray/ui/qt/panel.py`
+  is the same layout in Qt 6 (the `qt` backend), a second example of a complete port.
 
 ### Threading
 

@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from repotray.platform import for_name
+from repotray.platform.base import split_template
 from repotray.platform.macos import MacPlatform
 from repotray.platform.windows import RUN_KEY, WindowsPlatform, quote_argv
 
@@ -154,3 +155,69 @@ def test_quote_argv():
     assert quote_argv([r"C:\Program Files\py\pythonw.exe", "-m", "repotray"]) == (
         r'"C:\Program Files\py\pythonw.exe" -m repotray'
     )
+
+
+def test_windows_templates_keep_quoted_program_paths(tmp_path):
+    sp = Spawned()
+    p = WindowsPlatform(which=lambda n: None, run_spawn=sp, winreg=FakeWinreg())
+    code = r'"C:\Program Files\Microsoft VS Code\Code.exe" --new-window {path}'
+    assert split_template(code, tmp_path, posix=False) == [
+        r"C:\Program Files\Microsoft VS Code\Code.exe",
+        "--new-window",
+        str(tmp_path),
+    ]
+    p.open_folder(tmp_path, r'"C:\Tools\Total Commander\tc.exe" /O {path}')
+    assert sp.calls[-1] == ([r"C:\Tools\Total Commander\tc.exe", "/O", str(tmp_path)], tmp_path)
+    assert p.terminal_argv(tmp_path, r"C:\bin\pwsh.exe -wd {path}")[0] == r"C:\bin\pwsh.exe"
+
+
+def test_helpers_get_their_own_console_on_windows(monkeypatch):
+    import os
+
+    from repotray.platform import base
+
+    monkeypatch.setattr(os, "name", "nt")
+    flags = base.spawn_popen_kwargs()["creationflags"]
+    assert flags & 0x10  # CREATE_NEW_CONSOLE: `cmd /K` must not run hidden
+    assert not flags & 0x08000000  # never CREATE_NO_WINDOW (that is for git)
+
+
+def test_windows_tray_argv_has_no_console_window(tmp_path):
+    p = WindowsPlatform(winreg=FakeWinreg())
+    scripts = tmp_path / "Scripts"
+    scripts.mkdir()
+    python = scripts / "python.exe"
+    (scripts / "pythonw.exe").write_text("")
+    assert p.tray_argv(str(python)) == [str(scripts / "pythonw.exe"), "-m", "repotray", "tray"]
+    (scripts / "repotrayw.exe").write_text("")
+    assert p.tray_argv(str(python)) == [str(scripts / "repotrayw.exe"), "tray"]
+    # A system-wide Python keeps its launchers in Scripts\ next to python.exe.
+    root = tmp_path / "Python313"
+    (root / "Scripts").mkdir(parents=True)
+    (root / "Scripts" / "repotrayw.exe").write_text("")
+    assert p.tray_argv(str(root / "python.exe"))[0] == str(root / "Scripts" / "repotrayw.exe")
+    with pytest.raises(FileNotFoundError):
+        p.tray_argv(str(tmp_path / "nowhere" / "python.exe"))
+
+
+class Stream:
+    def __init__(self, encoding):
+        self.encoding = encoding
+
+    def reconfigure(self, encoding):
+        self.encoding = encoding
+
+
+def test_cli_writes_utf8_to_windows_pipes(monkeypatch):
+    import os
+
+    from repotray.cli import utf8_output
+
+    pipe, console = Stream("cp1252"), Stream("utf-8")
+    monkeypatch.setattr(os, "name", "nt")
+    utf8_output([pipe, console, None])
+    assert pipe.encoding == "utf-8" and console.encoding == "utf-8"
+    monkeypatch.setattr(os, "name", "posix")
+    latin = Stream("latin-1")
+    utf8_output([latin])
+    assert latin.encoding == "latin-1"  # only Windows is changed

@@ -52,15 +52,37 @@ class Platform(Protocol):
     def prefers_dark_panel(self) -> bool | None: ...
 
 
+def _unquote(word: str) -> str:
+    return word[1:-1] if len(word) >= 2 and word[0] == word[-1] == '"' else word
+
+
 def split_template(template: str, path: Path, posix: bool = True) -> list[str]:
-    """Split a command template, then substitute {path} inside each argument (no shell)."""
-    parts = shlex.split(template) if posix else template.split()
+    """Split a command template, then substitute {path} inside each argument (no shell).
+
+    ``posix=False`` is the Windows convention: backslashes are literal and double quotes group
+    words, so ``"C:\\Program Files\\…\\Code.exe" {path}`` keeps its program path in one piece.
+    """
+    if posix:
+        parts = shlex.split(template)
+    else:
+        parts = [_unquote(w) for w in shlex.split(template, posix=False)]
     return [p.replace("{path}", str(path)) for p in parts]
+
+
+def spawn_popen_kwargs() -> dict:
+    """Detach a helper the user sees (terminal, file manager, editor) from repotray. On Windows a
+    console program such as cmd gets a console window of its own; git's flags would hide it."""
+    if os.name == "nt":
+        flags = getattr(subprocess, "CREATE_NEW_CONSOLE", 0x10) | getattr(
+            subprocess, "CREATE_NEW_PROCESS_GROUP", 0x200
+        )
+        return {"creationflags": flags}
+    return {"start_new_session": True}
 
 
 def spawn(argv: list[str], cwd: Path | None = None) -> None:
     """Start a detached GUI helper; never wait for it."""
-    kwargs = default_popen_kwargs()
+    kwargs = spawn_popen_kwargs()
     subprocess.Popen(
         argv,
         cwd=str(cwd) if cwd else None,

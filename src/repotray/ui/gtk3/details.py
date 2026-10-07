@@ -2,34 +2,13 @@
 
 from __future__ import annotations
 
-import time
-
 import gi
 
 gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
 from gi.repository import Gdk, Gtk  # noqa: E402
 
-
-def details_text(result) -> str:
-    when = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(result.started_at))
-    lines = [
-        f"{result.name}: {result.action.value} {'succeeded' if result.ok else 'failed'}",
-        f"started {when}, took {result.duration:.1f} s",
-    ]
-    if result.restored is True:
-        lines.append("The repository was restored to its previous state.")
-    elif result.restored is False:
-        lines.append("WARNING: the repository was NOT restored — inspect it before continuing.")
-    lines.append("")
-    lines.append(f"Message: {result.message}")
-    for cmd in result.command:
-        lines.append(f"$ {cmd}")
-    if result.stdout.strip():
-        lines += ["", "--- stdout ---", result.stdout.rstrip()]
-    if result.stderr.strip():
-        lines += ["", "--- stderr ---", result.stderr.rstrip()]
-    return "\n".join(lines)
+from repotray.ui.text import details_text  # noqa: E402
 
 
 class DetailsDialog(Gtk.Dialog):

@@ -1,4 +1,5 @@
 import os
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -17,6 +18,7 @@ from repotray.core.gitrun import (
     CallKind,
     GitResult,
     GitRunner,
+    batch_ssh_command,
     first_line,
     git_environment,
     strip_credentials,
@@ -56,17 +58,37 @@ def test_runner_command_and_missing_git(tmp_path):
     )
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="shebang script")
-def test_runner_timeout_kills_group(tmp_path):
-    script = tmp_path / "fake-git"
-    script.write_text(f"#!{sys.executable}\nimport time, subprocess, sys\n"
-                      "subprocess.Popen(['sleep', '30'])\ntime.sleep(30)\n")  # fmt: skip
-    script.chmod(0o755)
-    r = GitRunner(git=str(script))
+def fake_git(tmp_path: Path, body: str) -> str:
+    """A program that runs ``body`` (Python) whatever git arguments it gets."""
+    script = tmp_path / "fake_git.py"
+    script.write_text(body)
+    if sys.platform == "win32":
+        launcher = tmp_path / "fake-git.cmd"
+        launcher.write_text(f'@"{sys.executable}" "{script}" %*\r\n')
+    else:
+        launcher = tmp_path / "fake-git"
+        launcher.write_text(f"#!/bin/sh\nexec '{sys.executable}' '{script}' \"$@\"\n")
+        launcher.chmod(0o755)
+    return str(launcher)
+
+
+HANG = (
+    "import subprocess, sys, time\n"
+    "subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(30)'])\n"
+    "time.sleep(30)\n"
+)
+
+
+@pytest.mark.parametrize("kind", [CallKind.ACTION, CallKind.FETCH, CallKind.STATUS])
+def test_runner_timeout_kills_group(tmp_path, kind, monkeypatch):
+    # Fetches and actions first read core.sshCommand: that must spend the same time budget.
+    monkeypatch.delenv("GIT_SSH_COMMAND", raising=False)
+    monkeypatch.delenv("GIT_SSH", raising=False)
+    r = GitRunner(git=fake_git(tmp_path, HANG))
     t = time.monotonic()
-    res = r(["x"], tmp_path, 0.5, kind=CallKind.ACTION)
+    res = r(["x"], tmp_path, 0.5, kind=kind)
     assert res.timed_out and time.monotonic() - t < 5
-    assert "timed out" in res.err
+    assert "timed out after 0.5 s" in res.err
 
 
 def test_first_line_and_credentials():
@@ -177,3 +199,47 @@ def test_busy_lock(tmp_path):
             lock_timeout=0.1,
         )
     assert not res.ok and res.message.startswith("busy")
+
+
+# --- ssh: the user's own ssh command keeps working, batch mode is added -------------------------
+
+PLINK = r'"C:\Program Files\PuTTY\plink.exe" -agent'
+
+
+@pytest.mark.parametrize(
+    ("configured", "expected"),
+    [
+        (None, "ssh -oBatchMode=yes"),
+        ("", "ssh -oBatchMode=yes"),
+        (
+            "C:/Windows/System32/OpenSSH/ssh.exe",
+            "C:/Windows/System32/OpenSSH/ssh.exe -oBatchMode=yes",
+        ),
+        ("ssh -i ~/.ssh/work", "ssh -i ~/.ssh/work -oBatchMode=yes"),
+        (PLINK, f"{PLINK} -batch"),
+        ("TortoisePlink.exe", "TortoisePlink.exe -batch"),
+    ],
+)
+def test_batch_ssh_command(configured, expected):
+    assert batch_ssh_command(configured) == expected
+
+
+def test_environment_keeps_core_ssh_command_and_user_overrides():
+    env = git_environment(CallKind.FETCH, base={}, ssh_command="C:/OpenSSH/ssh.exe")
+    assert env["GIT_SSH_COMMAND"] == "C:/OpenSSH/ssh.exe -oBatchMode=yes"
+    # GIT_SSH (a program) is the user's choice too: setting GIT_SSH_COMMAND would override it.
+    env = git_environment(CallKind.FETCH, base={"GIT_SSH": "C:/plink.exe"})
+    assert "GIT_SSH_COMMAND" not in env and env["GIT_SSH"] == "C:/plink.exe"
+
+
+def test_runner_reads_core_ssh_command_for_network_calls_only(tmp_path, monkeypatch):
+    monkeypatch.delenv("GIT_SSH_COMMAND", raising=False)
+    monkeypatch.delenv("GIT_SSH", raising=False)
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    subprocess.run(
+        ["git", "-C", str(tmp_path), "config", "core.sshCommand", "my-ssh -p 2222"], check=True
+    )
+    r = GitRunner()
+    assert r.configured_ssh(tmp_path) == "my-ssh -p 2222"
+    monkeypatch.setenv("GIT_SSH_COMMAND", "ssh -v")
+    assert r.configured_ssh(tmp_path) is None  # the environment wins, nothing to look up

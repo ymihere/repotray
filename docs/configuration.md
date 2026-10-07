@@ -60,14 +60,22 @@ that disappear are dropped silently at the next rescan.
 | `file_manager` | command template | `""` | *Open folder*. Empty = `xdg-open` / `open` / `explorer`. Example: `"nemo {path}"`. |
 | `editor` | command template | `""` | Text editor for *Open config file* and for the full list of incoming commits (*Show incoming commits… → Open in editor*). Empty = the desktop's default application for text files (`xdg-open`; on Linux Mint that is xed), macOS TextEdit, Windows' default. Example: `"code --new-window {path}"`. |
 
+On Windows, put a program path that contains spaces in double quotes, and write the whole value
+as a TOML literal string (single quotes) so the backslashes stay as they are:
+
+```toml
+terminal = '"C:\Program Files\PowerShell\7\pwsh.exe" -NoExit -WorkingDirectory {path}'
+editor = '"C:\Program Files\Microsoft VS Code\Code.exe" --new-window {path}'
+```
+
 ## Appearance and backend
 
 | Key | Type | Default | Notes |
 |---|---|---|---|
-| `backend` | string | `"auto"` | `auto`, `xapp`, `appindicator`, `gtkstatusicon`, `pystray`, `fake` or a plugin's name. `--backend` and `$REPOTRAY_BACKEND` override it. |
+| `backend` | string | `"auto"` | `auto`, `xapp`, `appindicator`, `gtkstatusicon`, `qt`, `pystray`, `fake` or a plugin's name. `auto` picks `xapp` on Cinnamon, `qt` on Windows. `--backend` and `$REPOTRAY_BACKEND` override it. |
 | `panel_sort` | `name` \| `state` | `"name"` | Order of the panel's rows: alphabetical, or syncable (diverged) first, then pushable, then pullable — each group alphabetical. |
-| `panel_theme` | `auto` \| `dark` \| `light` \| `system` | `"auto"` | `auto` follows the Cinnamon panel theme (dark if its name contains "dark"), so the panel matches Cinnamon's own popups even when the GTK theme is light. `system` leaves GTK alone. |
-| `log_level` | `debug` \| `info` \| `warning` | `"info"` | Log file: `~/.local/state/repotray/repotray.log`. |
+| `panel_theme` | `auto` \| `dark` \| `light` \| `system` | `"auto"` | `auto` follows the Cinnamon panel theme (dark if its name contains "dark"), so the panel matches Cinnamon's own popups even when the GTK theme is light; on Windows it follows the taskbar's dark/light setting (*Choose your default Windows mode*), like Windows' own tray flyouts. `system` leaves GTK (Windows: the app mode) alone. |
+| `log_level` | `debug` \| `info` \| `warning` | `"info"` | Log file: `~/.local/state/repotray/repotray.log`; Windows `%LOCALAPPDATA%\repotray\repotray.log`. |
 
 ## `[indicator]` — what the tray icon signals
 
@@ -96,6 +104,10 @@ then use `glyph_color` — set it to your panel's text colour, e.g. `"#2e3436"` 
 
 The icon also has two fixed states that take precedence: **error** (a red cross: every fetch
 failed, probably offline, or git is missing) and **paused** (two bars: fetching paused).
+
+**On Windows** the tray icon is a bitmap: there is no label (the counts are in the tooltip and the
+panel), the glyph is dark on a light taskbar and light on a dark one, and the theme colour names map
+to fixed shades (`warning` orange, `error` red, `success` green); `glyph_color` is not used.
 
 ### Recipes
 
@@ -149,4 +161,4 @@ name = "monorepo"      # display name
 |---|---|
 | `REPOTRAY_CONFIG` | Config file path (the `--config` option wins). |
 | `REPOTRAY_BACKEND` | Backend name (the `--backend` option wins over it, it wins over the config). |
-| `GIT_SSH_COMMAND` | Respected if set; otherwise repotray uses `ssh -oBatchMode=yes`. |
+| `GIT_SSH_COMMAND`, `GIT_SSH` | Respected if set. Otherwise repotray runs the repository's own `core.sshCommand` (e.g. `C:/Windows/System32/OpenSSH/ssh.exe`, so the Windows ssh-agent is used), or plain `ssh`, with `-oBatchMode=yes` added (`-batch` for PuTTY's plink) so ssh never waits for a password. |

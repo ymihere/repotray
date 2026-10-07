@@ -19,6 +19,7 @@ from pathlib import Path
 from repotray import __version__
 from repotray.core import config as cfgmod
 from repotray.core.actions import ActionContext, RepoLocks, plan_bulk, run_action, smart_kind
+from repotray.core.config import abbreviate
 from repotray.core.gitrun import GitRunner, git_version
 from repotray.core.gitstatus import apply_fetch_result, check_status, fetch_repo
 from repotray.core.indicator import counts
@@ -32,16 +33,6 @@ log = logging.getLogger("repotray")
 
 
 # --- helpers -------------------------------------------------------------------------------------
-
-
-def abbreviate(path: Path) -> str:
-    home = Path.home()
-    if path == home:
-        return "~"
-    try:
-        return "~/" + str(path.relative_to(home))
-    except ValueError:
-        return str(path)
 
 
 def config_path(args) -> Path:
@@ -410,7 +401,11 @@ def cmd_config(args) -> int:
 
 
 def tray_argv() -> list[str]:
-    """How autostart should launch the tray."""
+    """How autostart should launch the tray (a platform may know better, e.g. Windows: no
+    console window)."""
+    own = getattr(current(), "tray_argv", None)
+    if own is not None:
+        return own()
     launcher = shutil.which("repotray")
     if launcher:
         return [str(Path(launcher).absolute()), "tray"]
@@ -420,7 +415,11 @@ def tray_argv() -> list[str]:
 def cmd_autostart(args) -> int:
     p = current()
     if args.what == "enable":
-        print(f"autostart enabled: {p.autostart_enable(tray_argv())}")
+        try:
+            argv = tray_argv()
+        except OSError as exc:
+            return _die(f"cannot enable autostart: {exc}", EXIT_FAILED)
+        print(f"autostart enabled: {p.autostart_enable(argv)}")
     elif args.what == "disable":
         p.autostart_disable()
         print("autostart disabled")
@@ -557,7 +556,20 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
+def utf8_output(streams=None) -> None:
+    """Windows writes pipes and files in the ANSI code page (cp1252), which has no ↑ ↓ ✎ and
+    makes print() fail: write UTF-8 there, as the console shows it (and as Python 3.15 will by
+    default). Consoles and other systems are left alone."""
+    if os.name != "nt":
+        return
+    for stream in streams if streams is not None else (sys.stdout, sys.stderr):
+        enc = (getattr(stream, "encoding", None) or "").lower().replace("-", "")
+        if stream is not None and enc != "utf8" and hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8")
+
+
 def main(argv: list[str] | None = None) -> int:
+    utf8_output()
     parser = build_parser()
     args = parser.parse_args(argv)
     if args.command is None:

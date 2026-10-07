@@ -15,6 +15,7 @@ keywords = ["git", "tray", "indicator", "cinnamon", "status", "repositories"]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Environment :: X11 Applications :: GTK",
+  "Environment :: Win32 (MS Windows)",
   "Intended Audience :: Developers",
   "Operating System :: POSIX :: Linux",
   "Operating System :: MacOS",
@@ -28,16 +29,22 @@ classifiers = [
   "Topic :: Desktop Environment",
 ]
 dependencies = [
-  "pystray>=0.19; sys_platform == 'darwin' or sys_platform == 'win32'",
+  "PySide6-Essentials>=6.8; sys_platform == 'win32'",
+  "pystray>=0.19; sys_platform == 'darwin'",
   "Pillow>=9; sys_platform == 'darwin' or sys_platform == 'win32'",
 ]
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.6", "shapely>=2", "svgpathtools>=1.6", "build", "twine"]
 pystray = ["pystray>=0.19", "Pillow>=9"]
+qt = ["PySide6-Essentials>=6.8", "Pillow>=9"]
 
 [project.scripts]
 repotray = "repotray.cli:main"
+
+[project.gui-scripts]
+# Windows: starts the tray without a console window (autostart uses it).
+repotrayw = "repotray.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/ymihere/repotray"
@@ -79,6 +86,6 @@ testpaths = ["tests"]
 addopts = "-ra"
 markers = [
   "integration: uses real git processes in a temporary directory",
-  "gui: needs a display and REPOTRAY_GUI_TESTS=1",
+  "gui: needs a display and REPOTRAY_GUI_TESTS=1 (Qt tests run offscreen without it)",
   "conformance: backend conformance suite (REPOTRAY_BACKEND selects the backend)",
 ]

@@ -9,7 +9,7 @@ from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from repotray.core.config import Config, expand
+from repotray.core.config import Config, abbreviate, expand
 from repotray.core.gitrun import CallKind, Runner
 from repotray.core.types import RepoInfo
 
@@ -55,14 +55,6 @@ def walk_root(root: Path, max_depth: int, exclude: frozenset[str], descend: bool
         stack.extend((c, depth + 1) for c in children)
 
 
-def _abbrev(path: Path) -> str:
-    home = Path.home()
-    try:
-        return "~/" + str(path.relative_to(home)) if path != home else "~"
-    except ValueError:
-        return str(path)
-
-
 def display_names(paths: list[Path], overrides: dict[Path, str]) -> dict[Path, str]:
     """basename; parent/basename on collision; then the ~-abbreviated path."""
     names: dict[Path, str] = {}
@@ -83,7 +75,7 @@ def display_names(paths: list[Path], overrides: dict[Path, str]) -> dict[Path, s
                 names[sub[0]] = label
             else:
                 for p in sub:
-                    names[p] = _abbrev(p)
+                    names[p] = abbreviate(p)
     names.update({p: n for p, n in overrides.items() if p in set(paths)})
     return names
 

@@ -12,7 +12,7 @@ from typing import ClassVar
 
 from repotray.backends.base import ProbeResult, caps
 from repotray.backends.gtkbase import GtkBackendBase, is_linux
-from repotray.ui.placement import ICON_HALF, Anchor
+from repotray.ui.placement import Anchor, Rect, anchor_from_icon
 
 # Gtk.StatusIcon is deprecated but remains the only XEmbed tray API in GTK 3.
 warnings.filterwarnings("ignore", message=r".*Gtk\.StatusIcon", category=DeprecationWarning)
@@ -86,19 +86,11 @@ class GtkStatusIconBackend(GtkBackendBase):
         if not ok:
             return None
         display = Gdk.Display.get_default()
-        mon = display.get_monitor_at_point(area.x, area.y)
-        geo = mon.get_geometry()
-        cx = area.x + area.width // 2 - ICON_HALF
-        cy = area.y + area.height // 2 - ICON_HALF
-        if area.y > geo.y + geo.height // 2:
-            return Anchor(cx, area.y, "bottom")
-        if area.y + area.height < geo.y + geo.height // 2 and area.height < geo.height // 4:
-            if area.x < geo.x + geo.width // 8:
-                return Anchor(area.x + area.width, cy, "left")
-            if area.x > geo.x + geo.width * 7 // 8:
-                return Anchor(area.x, cy, "right")
-            return Anchor(cx, area.y + area.height, "top")
-        return Anchor(cx, area.y, None)
+        geo = display.get_monitor_at_point(area.x, area.y).get_geometry()
+        return anchor_from_icon(
+            Rect(area.x, area.y, area.width, area.height),
+            Rect(geo.x, geo.y, geo.width, geo.height),
+        )
 
     def _on_activate(self, _icon) -> None:
         from gi.repository import Gtk
