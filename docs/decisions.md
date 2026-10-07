@@ -33,6 +33,26 @@ Format: date — question → choice (reason).
   glyph vertex stays ≥ 3.99 from a dot centre.
 - 2026-10-07 — `scripts/dev/preview-icons.py` uses Adwaita-like theme colours (success #33d17a,
   warning #f27835, error #e01b24) for the preview; real panels use their own.
+- 2026-10-07 — Panel window: type hint `UTILITY` worked on Muffin (focus-out fires; GUI test
+  `test_focus_loss_hides` passes), so `DIALOG` was not needed. The window is also made sticky.
+- 2026-10-07 — The panel view rebuilds per section (header, banner, rows, groups, footer) when that
+  section's model changed, not per row: rows are cheap and a changed row usually swaps a button for
+  a spinner anyway.
+- 2026-10-07 — Disabled action buttons are wrapped in an EventBox so their reason tooltip
+  ("Diverged — use Sync", "Commit or stash first") still shows; GTK hides tooltips of insensitive
+  widgets.
+- 2026-10-07 — The scroller's min content height is pinned to min(rows, 12 rows): undecorated
+  toplevels were allocated only the scroller's minimum height (one row).
+- 2026-10-07 — Controller gained `dispatch(action, path)` (menu/panel actions by name), `refresh()`
+  (re-render for relative times and banner expiry, ticked every 2 s while the panel is open),
+  `panel_opened()` / `panel_closed()` (closing acknowledges failure banners).
+- 2026-10-07 — While Sync all runs, per-repo results are not notified; only the summary is.
+- 2026-10-07 — libxapp crashes (SIGSEGV in the main loop) when an `XApp.StatusIcon` is finalised
+  right after creation. The tray never disposes its icon; the conformance tests keep backends alive.
+- 2026-10-07 — `scripts/dev/render-panel.py` renders the panel offscreen from the demo snapshot in
+  several states (used while the screen was locked, and for doc screenshots).
+- 2026-10-07 — The instance lock file is never unlinked on exit (unlinking races a starting
+  instance); `repotray quit` checks that the lock is actually held before trusting the pid.
 
 ## Blocked / unverified
 - 2026-10-07 — **Live tray screenshots (M2, M3) while the session is locked.** The maintainer's
@@ -40,3 +60,8 @@ Format: date — question → choice (reason).
   the lock-screen wallpaper. Icons were verified offline with GTK's symbolic loader (contact sheet),
   the panel by rendering it offscreen (`Gtk.OffscreenWindow`). The live checks are repeated whenever
   the session is unlocked during the run; see HANDOFF.md for what remained unverified.
+  Update: the session was unlocked again later the same morning; the M2 live icon check and all
+  four M3 live checks were then done for real (screenshots in the run's scratchpad, not committed).
+- Clicks were simulated over D-Bus (`scripts/dev/click-tray.sh`), never with a real mouse: a real
+  click first moves focus to the panel applet, which the 300 ms reopen guard handles (unit-tested,
+  not observed live).
