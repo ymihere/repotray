@@ -9,10 +9,10 @@ click opens a panel with push / pull / sync buttons.
   implementing repotray follows PLAN.md milestone by milestone without needing to ask.
 - **`CLAUDE.local.md`** (gitignored, may be absent) — facts about the maintainer's dev machine.
 
-## Status (2026-10-07)
-0.1.0 release candidate: PLAN.md milestones M0–M6 done, committed locally, not pushed or
-published (the maintainer does that, see RELEASING.md). Installed for the maintainer with
-`scripts/install.sh` (no autostart). Implementation choices: `docs/decisions.md`; hand-off notes:
+## Status (2026-11-04)
+0.1.0 release candidate: PLAN.md milestones M0–M6 done plus the Windows Qt backend, pushed to
+GitHub (CI green), not yet public or on PyPI (the maintainer does that, see RELEASING.md).
+Installed for the maintainer with `scripts/install.sh` (no autostart). Implementation choices: `docs/decisions.md`; hand-off notes:
 `HANDOFF.md` (gitignored).
 
 ## Decisions already made

@@ -1,5 +1,9 @@
 # repotray
 
+[![CI](https://github.com/ymihere/repotray/actions/workflows/ci.yml/badge.svg)](https://github.com/ymihere/repotray/actions/workflows/ci.yml)
+[![Licence: MIT](https://img.shields.io/badge/licence-MIT-blue.svg)](LICENSE)
+![Python ≥ 3.11](https://img.shields.io/badge/python-%E2%89%A5%203.11-blue.svg)
+
 A tray indicator that watches all the git clones on your machine and shows, at a glance, how many
 have **local work** (uncommitted changes or commits to push) and how many have **remote work**
 (commits to pull). Hover to see which repositories; click to get a panel with one-click
@@ -86,10 +90,11 @@ has uncommitted tracked changes, and if the rebase hits conflicts it is aborted 
 is left as it was. Before pulling, *Show incoming commits…* in a repository's menu lists the commit
 messages a pull would bring, with a button to open the full log in your text editor and a *Pull*
 button (*Sync* for a diverged branch) to bring them in.
-**Push all** pushes every repository that is only ahead, **Pull all** pulls
-every one that is only behind, and **Sync all** does both and also syncs the diverged ones. Rows
-are sorted by name; `panel_sort = "state"` puts syncable, then pushable, then pullable first. Click a repository name for
-*Open terminal here* (your desktop's default terminal), *Open folder*, *Copy path*, *Fetch now*
+
+**Push all** pushes every repository that is only ahead, **Pull all** pulls every one that is only
+behind, and **Sync all** does both and also syncs the diverged ones. Rows are sorted by name;
+`panel_sort = "state"` puts syncable, then pushable, then pullable first. Click a repository name
+for *Open terminal here* (your desktop's default terminal), *Open folder*, *Copy path*, *Fetch now*
 and, when there is something to pull, *Show incoming commits…*.
 
 repotray fetches every 10 minutes (and after resume from suspend), checks local status every
@@ -103,6 +108,8 @@ The config file is created on first run at `~/.config/repotray/config.toml` (Win
 ```toml
 roots = ["~/code", "~/work"]      # where to look for clones (default: your home)
 ignore = ["~/work/archive/*"]
+repos = ["~/code/app/plugins/sdk"] # extra clones, e.g. one nested inside another repository
+descend_into_repos = false        # true: find every repository nested inside another one
 fetch_interval = 600
 sync_strategy = "rebase"          # or "merge"
 
@@ -159,6 +166,9 @@ Details, exit codes and the JSON schema: [docs/cli.md](docs/cli.md).
 | Windows 11 | qt | **Tested** — icon, tooltip, panel, menus, dialogs |
 | Windows 10 | qt | Expected to work (icons from Segoe MDL2 Assets, square corners) |
 | macOS | pystray | Experimental, untested — help wanted |
+
+On Cinnamon, the counts next to the icon can show only "…" when another applet in the panel has a
+fractional width; [docs/troubleshooting.md](docs/troubleshooting.md) has the one-line fix.
 
 Ports are welcome: see [docs/porting.md](docs/porting.md).
 
