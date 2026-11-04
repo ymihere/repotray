@@ -15,6 +15,27 @@ found, which tray backend is used and why, and whether the icons are installed. 
 - Force a backend with `repotray tray --backend appindicator` (or `backend = "…"` in the config) to
   compare.
 
+## The counts next to the icon show only "…" (Cinnamon)
+
+Cinnamon's XApp Status Applet shortens a label to "…" when the panel gives it even a fraction of
+a pixel less than it asked for. That happens when another applet in the same panel zone reports a
+fractional width (for example *multicore-sys-monitor*): the panel rounds the zone down and takes the
+missing pixel from the label. repotray cannot work around it; the label text is all it controls
+([linuxmint/cinnamon#14096](https://github.com/linuxmint/cinnamon/issues/14096)).
+
+- Move the applet with the fractional width to another zone of the panel, or
+- install a fixed copy of the XApp applet as a user override (Cinnamon prefers it to the system
+  copy; delete it again once your Cinnamon includes the fix):
+
+  ```sh
+  cp -r /usr/share/cinnamon/applets/xapp-status@cinnamon.org ~/.local/share/cinnamon/applets/
+  cd ~/.local/share/cinnamon/applets/xapp-status@cinnamon.org
+  sed -i 's|^const St = imports.gi.St;|&\nconst Pango = imports.gi.Pango;|' applet.js
+  sed -i "/'y-align': St.Align.END,/{n;s|$|\n        this.label.clutter_text.ellipsize = Pango.EllipsizeMode.NONE;|}" applet.js
+  dbus-send --session --dest=org.Cinnamon --type=method_call /org/Cinnamon \
+      org.Cinnamon.ReloadXlet string:xapp-status@cinnamon.org string:APPLET
+  ```
+
 ## The icon is not recoloured like the others
 
 Symbolic recolouring only works with theme colour names. If any `[indicator]` colour is a
