@@ -139,6 +139,29 @@ def test_panel_rows_and_buttons(ui):
     assert len(titles) == 4  # uncommitted, no upstream, fetch failed, in sync
 
 
+def test_expanders_keep_their_state(ui):
+    ctl, panel = ui
+    v = panel.view
+
+    def expanders():
+        return {
+            c.get_label_widget().get_children()[-1].get_text()
+            if c.get_label_widget() and isinstance(c.get_label_widget(), Gtk.Box)
+            else c.get_label(): c
+            for c in v.groups.get_children()
+            if isinstance(c, Gtk.Expander)
+        }
+
+    exp = expanders()
+    assert set(exp) == {"Uncommitted (3)", "In sync (2)"}
+    assert exp["Uncommitted (3)"].get_expanded() and not exp["In sync (2)"].get_expanded()
+    exp["Uncommitted (3)"].set_expanded(False)
+    exp["In sync (2)"].set_expanded(True)
+    v._set_groups(v.model)  # rebuilt, as after a status change
+    exp = expanders()
+    assert not exp["Uncommitted (3)"].get_expanded() and exp["In sync (2)"].get_expanded()
+
+
 def test_push_shows_spinner_then_success_banner(ui):
     ctl, panel = ui
     panel.show_at(Anchor(4000, 1400, "bottom"))

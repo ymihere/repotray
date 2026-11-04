@@ -17,7 +17,13 @@ pytestmark = pytest.mark.gui
 pytest.importorskip("PySide6")
 from PySide6.QtCore import QEvent, Qt  # noqa: E402
 from PySide6.QtGui import QGuiApplication, QKeyEvent  # noqa: E402
-from PySide6.QtWidgets import QApplication, QSystemTrayIcon, QToolButton, QWidget  # noqa: E402
+from PySide6.QtWidgets import (  # noqa: E402
+    QApplication,
+    QLabel,
+    QSystemTrayIcon,
+    QToolButton,
+    QWidget,
+)
 
 from repotray.app import Controller  # noqa: E402
 from repotray.backends.qt import QtBackend  # noqa: E402
@@ -26,7 +32,7 @@ from repotray.core.demo import DemoScheduler  # noqa: E402
 from repotray.platform import current  # noqa: E402
 from repotray.ui.placement import Anchor  # noqa: E402
 from repotray.ui.qt.menus import literal  # noqa: E402
-from repotray.ui.qt.panel import BANNER_COLORS, NameButton  # noqa: E402
+from repotray.ui.qt.panel import BANNER_COLORS, ExpanderHead, NameButton  # noqa: E402
 from repotray.ui.qt.widgets import Spinner  # noqa: E402
 
 BOTTOM = Anchor(1500, 1150, "bottom")
@@ -96,7 +102,33 @@ def test_panel_rows_and_buttons(ui):
         "Fetch failed (1)",
         "In sync (2)",
     ]
-    assert v.groups.count() == 5  # three title lines + the "In sync" expander and its chips
+    # two title lines + the "Uncommitted" and "In sync" expanders, each with its chips
+    assert v.groups.count() == 6
+
+
+def test_expanders_keep_their_state(ui):
+    ctl, panel = ui
+    v = panel.view
+
+    def expanders():
+        heads = [v.groups.itemAt(i).widget() for i in range(v.groups.count())]
+        return {
+            h.findChildren(QLabel)[-1].text(): (h, heads[i + 1])
+            for i, h in enumerate(heads)
+            if isinstance(h, ExpanderHead)
+        }
+
+    exp = expanders()
+    assert set(exp) == {"Uncommitted (3)", "In sync (2)"}
+    head, chips = exp["Uncommitted (3)"]
+    assert head.arrow.isChecked() and not chips.isHidden()
+    assert exp["In sync (2)"][1].isHidden()
+    head.arrow.toggle()
+    assert chips.isHidden()
+    v._set_groups(v.model)  # rebuilt, as after a status change
+    exp = expanders()
+    assert exp["Uncommitted (3)"][1].isHidden() and not exp["Uncommitted (3)"][0].arrow.isChecked()
+    assert exp["In sync (2)"][1].isHidden()
 
 
 def test_push_shows_spinner_then_success_banner(ui):

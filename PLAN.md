@@ -407,7 +407,7 @@ Header(summary: str, fetched_text: str, fetching: bool, paused: bool, warning: s
 Row(left: Cell | None, sync: Button | None, right: Cell | None)
 Cell(path: Path, name: str, tooltip: str, count_text: str, dirty: bool, warning: str | None, button: Button)
 Button(action: ActionKind, enabled: bool, busy: bool, tooltip: str)
-Group(kind: str, title: str, icon_name: str, chips: tuple[Chip, ...], collapsed: bool)
+Group(kind: str, title: str, icon_name: str, chips: tuple[Chip, ...], collapsible: bool, collapsed: bool)
 Chip(path: Path, name: str, tooltip: str)
 Footer(sync_all: Button, label: str)            # label "Sync all" / "Syncing 2/5…"
 Banner(kind: str, text: str, result: ActionResult | None, expires_at: float | None)
@@ -424,9 +424,10 @@ Rules (SPEC §2.5 is the visual reference):
 - Header summary: "All N repos in sync" / "N repos need attention" / "Fetching…" / "Offline — fetch
   failed for every repo, retrying in 8 min" / "Fetching paused". `fetched_text` "Fetched 3 min ago",
   "Fetched just now", "Never fetched".
-- Groups in order, each omitted when empty: `✎ Uncommitted` (all dirty repos), `⚠ No upstream`
-  (incl. upstream gone, tooltip says which), `Detached`, `⚠ In progress` (operation set), `⚠ Fetch
-  failed` (tooltip: the error), `In sync` (collapsed).
+- Groups in order, each omitted when empty: `✎ Uncommitted` (all dirty repos; collapsible, open),
+  `⚠ No upstream` (incl. upstream gone, tooltip says which), `Detached` (collapsed), `⚠ In progress`
+  (operation set), `⚠ Fetch failed` (tooltip: the error), `In sync` (collapsed). The panel keeps
+  each expander's state per group kind while it runs.
 - Banner: the newest result younger than 6 s (success) or the newest unacknowledged failure; failures
   persist until the panel is closed.
 - `empty_text = "Nothing to push or pull"` when there are no rows.

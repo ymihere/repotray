@@ -90,7 +90,8 @@ class Group:
     title: str
     icon_name: str
     chips: tuple[Chip, ...]
-    collapsed: bool = False
+    collapsible: bool = False  # shown as an expander
+    collapsed: bool = False  # the expander starts closed
 
 
 @dataclass(frozen=True, slots=True)
@@ -366,7 +367,15 @@ def build_groups(snapshot: Snapshot, config: Config) -> tuple[Group, ...]:
     groups: list[Group] = []
     dirty = [s for s in repos if s.dirty(config.count_untracked_as_dirty)]
     if dirty:
-        groups.append(Group("dirty", f"Uncommitted ({len(dirty)})", ICON_DIRTY, chips(dirty)))
+        groups.append(
+            Group(
+                "dirty",
+                f"Uncommitted ({len(dirty)})",
+                ICON_DIRTY,
+                chips(dirty),
+                collapsible=True,
+            )
+        )
     no_up = [s for s in repos if s.no_upstream]
     if no_up:
 
@@ -384,7 +393,16 @@ def build_groups(snapshot: Snapshot, config: Config) -> tuple[Group, ...]:
         )
     detached = [s for s in repos if s.detached]
     if detached:
-        groups.append(Group("detached", f"Detached ({len(detached)})", "", chips(detached)))
+        groups.append(
+            Group(
+                "detached",
+                f"Detached ({len(detached)})",
+                "",
+                chips(detached),
+                collapsible=True,
+                collapsed=True,
+            )
+        )
     ops = [s for s in repos if s.operation]
     if ops:
         groups.append(
@@ -430,7 +448,16 @@ def build_groups(snapshot: Snapshot, config: Config) -> tuple[Group, ...]:
         )
     ]
     if clean:
-        groups.append(Group("in_sync", f"In sync ({len(clean)})", "", chips(clean), True))
+        groups.append(
+            Group(
+                "in_sync",
+                f"In sync ({len(clean)})",
+                "",
+                chips(clean),
+                collapsible=True,
+                collapsed=True,
+            )
+        )
     return tuple(groups)
 
 

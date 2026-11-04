@@ -7,6 +7,10 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Changed
+- The panel's *Detached* group is collapsed like *In sync*: repotray cannot act on those
+  repositories (submodules, tag checkouts), and an unfinished rebase still shows under *In progress*.
+- The panel's *Uncommitted* group can be folded away; it starts open. Each group keeps its
+  open/closed state while repotray runs.
 - The tray icon's corner markers are now arrows: a ▲ top-right when there is something to push,
   a ▼ bottom-right when there is something to pull. `[indicator] marker = "dot"` restores the
   Mint-style dots.

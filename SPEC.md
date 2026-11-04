@@ -136,7 +136,8 @@ labelled button.
 │ infra         ↑1     (↑)                                             │
 │                                               (↓)   ↓2       website │
 ├──────────────────────────────────────────────────────────────────────┤
-│ ✎ Uncommitted (3)   api-gateway · notes · scratch                    │
+│ ▾ ✎ Uncommitted (3)                                                  │
+│     api-gateway · notes · scratch                                    │
 │ ⚠ No upstream (1)   experiments                                      │
 │ ▸ In sync (8)                                                        │
 └──────────────────────────────────────────────────────────────────────┘
@@ -199,9 +200,12 @@ then arrive as desktop notifications (§2.4).
 
 **Groups below the columns** (each hidden when empty; names are clickable chips with
 the same context menu):
-- `✎ Uncommitted (N)` — every dirty repo, including those already in the Push column.
-- `⚠ No upstream (N)`, `Detached (N)`, `⚠ In progress (N)` (a rebase/merge/… is under way),
+- `▾ ✎ Uncommitted (N)` — open expander: every dirty repo, including those already in the Push
+  column; one click folds it away (decided 2026-11-04).
+- `⚠ No upstream (N)`, `⚠ In progress (N)` (a rebase/merge/… is under way),
   `⚠ Fetch failed (N)` (tooltip: the error), `⚠ Unreadable (N)` (`git status` failed).
+- `▸ Detached (N)` — collapsed expander: nothing repotray can act on (submodules, tag
+  checkouts); a stopped rebase/bisect also shows under *In progress* (decided 2026-11-04).
 - `▸ In sync (N)` — collapsed expander listing the clean repos, so one can confirm
   that a repo is being watched without the CLI.
 

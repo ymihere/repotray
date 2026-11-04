@@ -177,7 +177,7 @@ class PanelView(Gtk.Box):
         self.pack_start(self.sep2, False, False, 2)
         self.groups = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
         self.pack_start(self.groups, False, False, 0)
-        self.expanded = False
+        self.expanded: dict[str, bool] = {}  # group kind -> open, as the user left it
 
         self.show_all()
         # Visibility of these follows the model; a later show_all() must not reveal them.
@@ -380,10 +380,15 @@ class PanelView(Gtk.Box):
                 b.set_tooltip_text(chip.tooltip)
                 b.connect("clicked", lambda w, m=chip.menu: self._popup_repo_menu(w, m))
                 flow.add(b)
-            if g.collapsed:
+            if g.collapsible:
                 exp = Gtk.Expander(label=g.title)
-                exp.set_expanded(self.expanded)
-                exp.connect("notify::expanded", self._on_expanded)
+                if g.icon_name:
+                    head = Gtk.Box(spacing=4)
+                    head.pack_start(_icon(g.icon_name), False, False, 0)
+                    head.pack_start(_label(g.title), False, False, 0)
+                    exp.set_label_widget(head)
+                exp.set_expanded(self.expanded.get(g.kind, not g.collapsed))
+                exp.connect("notify::expanded", self._on_expanded, g.kind)
                 exp.add(flow)
                 self.groups.pack_start(exp, False, False, 0)
                 continue
@@ -399,8 +404,8 @@ class PanelView(Gtk.Box):
             self.groups.pack_start(line, False, False, 0)
         self.groups.show_all()
 
-    def _on_expanded(self, expander: Gtk.Expander, _pspec) -> None:
-        self.expanded = expander.get_expanded()
+    def _on_expanded(self, expander: Gtk.Expander, _pspec, kind: str) -> None:
+        self.expanded[kind] = expander.get_expanded()
 
 
 class Panel(Gtk.Window):

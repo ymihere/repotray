@@ -157,6 +157,33 @@ class NameButton(QToolButton):
         self.setToolTip(tooltip)
 
 
+class ExpanderHead(QWidget):
+    """A collapsible group's title line: arrow, optional icon, title; a click anywhere toggles."""
+
+    def __init__(self, title: str, icon_name: str, is_open: bool) -> None:
+        super().__init__()
+        self.arrow = QToolButton()
+        self.arrow.setCheckable(True)
+        self.arrow.setChecked(is_open)
+        self.arrow.setAutoRaise(True)
+        self.arrow.setArrowType(Qt.ArrowType.DownArrow if is_open else Qt.ArrowType.RightArrow)
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(4)
+        lay.addWidget(self.arrow)
+        if icon_name:
+            lay.addWidget(_icon_label(icon_name, ""))
+        lay.addWidget(QLabel(title))
+        lay.addStretch(1)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+
+    def mousePressEvent(self, event) -> None:  # noqa: N802 - Qt override
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.arrow.toggle()
+        else:
+            super().mousePressEvent(event)
+
+
 class PanelView(QWidget):
     """Everything inside the panel window. Usable without showing it, for tests and screenshots."""
 
@@ -166,7 +193,7 @@ class PanelView(QWidget):
         self.on_details: Callable[[object], None] | None = None
         self.model: PanelModel | None = None
         self.control_items: tuple = ()
-        self.expanded = False
+        self.expanded: dict[str, bool] = {}  # group kind -> open, as the user left it
         self.open_menu = None
         lay = QVBoxLayout(self)
         lay.setContentsMargins(12, 10, 12, 10)
@@ -445,19 +472,14 @@ class PanelView(QWidget):
                     lambda _checked=False, w=b, items=chip.menu: self.popup_repo_menu(w, items)
                 )
                 flow.add(b)
-            if g.collapsed:
-                exp = QToolButton()
-                exp.setText(literal(g.title))
-                exp.setCheckable(True)
-                exp.setChecked(self.expanded)
-                exp.setAutoRaise(True)
-                exp.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
-                exp.setArrowType(
-                    Qt.ArrowType.DownArrow if self.expanded else Qt.ArrowType.RightArrow
+            if g.collapsible:
+                is_open = self.expanded.get(g.kind, not g.collapsed)
+                head = ExpanderHead(g.title, g.icon_name, is_open)
+                flow_host.setVisible(is_open)
+                head.arrow.toggled.connect(
+                    lambda on, h=head, f=flow_host, k=g.kind: self._on_expanded(h, f, k, on)
                 )
-                flow_host.setVisible(self.expanded)
-                exp.toggled.connect(lambda on, e=exp, f=flow_host: self._on_expanded(e, f, on))
-                self.groups.addWidget(exp)
+                self.groups.addWidget(head)
                 self.groups.addWidget(flow_host)
                 continue
             line = QHBoxLayout()
@@ -475,9 +497,9 @@ class PanelView(QWidget):
             self.groups.addLayout(line)
         self.updateGeometry()
 
-    def _on_expanded(self, button: QToolButton, flow_host: QWidget, on: bool) -> None:
-        self.expanded = on
-        button.setArrowType(Qt.ArrowType.DownArrow if on else Qt.ArrowType.RightArrow)
+    def _on_expanded(self, head: ExpanderHead, flow_host: QWidget, kind: str, on: bool) -> None:
+        self.expanded[kind] = on
+        head.arrow.setArrowType(Qt.ArrowType.DownArrow if on else Qt.ArrowType.RightArrow)
         flow_host.setVisible(on)
         fit = getattr(self.window(), "fit", None)
         if fit is not None:

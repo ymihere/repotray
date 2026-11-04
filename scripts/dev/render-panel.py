@@ -86,7 +86,7 @@ def main() -> None:
     frame.get_style_context().add_class("repotray-panel")
     frame.get_style_context().add_class("background")
     view = PanelView(lambda *_: None)
-    view.expanded = a.expand
+    view.expanded = {"in_sync": True} if a.expand else {}
     view.set_control_menu(control_menu(snap))
     view.set_model(panel_model(snap, Config(), now))
     frame.add(view)

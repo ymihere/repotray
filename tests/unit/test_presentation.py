@@ -157,7 +157,9 @@ def test_demo_groups():
     assert [c.name for c in groups["dirty"].chips] == ["api-gateway", "notes", "scratch"]
     assert [c.name for c in groups["no_upstream"].chips] == ["experiments", "scratch"]
     assert "Could not resolve host" in groups["fetch_failed"].chips[0].tooltip
-    assert groups["in_sync"].collapsed
+    assert groups["dirty"].collapsible and not groups["dirty"].collapsed
+    assert groups["in_sync"].collapsible and groups["in_sync"].collapsed
+    assert not groups["no_upstream"].collapsible
     assert [c.name for c in groups["in_sync"].chips] == ["docs", "dotfiles"]
 
 
@@ -175,6 +177,13 @@ def test_operation_in_progress_blocks():
     m = panel_model(s, Config(), NOW)
     assert m.rows[0].left.button.tooltip == "Operation in progress: rebase"
     assert any(g.kind == "in_progress" for g in m.groups)
+
+
+def test_detached_group_collapsed():
+    s = snap(st("sub", branch=None, upstream=None, detached=True), st("tag", detached=True))
+    groups = {g.kind: g for g in panel_model(s, Config(), NOW).groups}
+    assert groups["detached"].collapsed and groups["detached"].title == "Detached (2)"
+    assert [c.name for c in groups["detached"].chips] == ["sub", "tag"]
 
 
 def test_local_upstream_has_no_push():
