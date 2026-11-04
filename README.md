@@ -175,7 +175,7 @@ Ports are welcome: see [docs/porting.md](docs/porting.md).
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). Design: [SPEC.md](SPEC.md) (behaviour) and
-[PLAN.md](PLAN.md) (structure); [docs/architecture.md](docs/architecture.md) for an overview;
+[docs/architecture.md](docs/architecture.md) (structure);
 [docs/troubleshooting.md](docs/troubleshooting.md) when something does not work.
 
 ## Credits

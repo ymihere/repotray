@@ -1,6 +1,8 @@
-# Private notes about the maintainer machine
+# Maintainer-only notes (agent instructions, build plan, machine facts)
+CLAUDE.md
 CLAUDE.local.md
 HANDOFF.md
+PLAN.md
 
 # Python
 .venv/

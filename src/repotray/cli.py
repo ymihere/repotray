@@ -1,4 +1,4 @@
-"""Command line interface (SPEC §8, PLAN §4.14). Headless: never imports a GUI toolkit."""
+"""Command line interface (SPEC §8). Headless: never imports a GUI toolkit."""
 
 from __future__ import annotations
 

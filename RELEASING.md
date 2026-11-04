@@ -4,7 +4,7 @@ Nothing here is automated by agents: publishing is the maintainer's call.
 
 ## First publication
 
-1. Review `git log` and `HANDOFF.md` (local, untracked); run the manual checklist in it.
+1. Review `git log` since the last release and `CHANGELOG.md`.
 2. Push: `git push -u origin main`.
 3. Make the GitHub repository public (Settings → General → Danger zone → Change visibility).
 4. Enable private vulnerability reporting (Settings → Code security → Private vulnerability

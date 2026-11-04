@@ -62,7 +62,8 @@ LINK = re.compile(r"\[[^\]]*\]\(([^)\s]+)\)")
 def markdown_files() -> list[Path]:
     files = [p for p in ROOT.glob("*.md")] + list((ROOT / "docs").glob("*.md"))
     files += list((ROOT / ".github").rglob("*.md"))
-    return [p for p in files if p.name not in ("CLAUDE.local.md", "HANDOFF.md")]
+    local_only = ("CLAUDE.md", "CLAUDE.local.md", "HANDOFF.md", "PLAN.md")  # gitignored
+    return [p for p in files if p.name not in local_only]
 
 
 @pytest.mark.parametrize("md", markdown_files(), ids=lambda p: str(p.relative_to(ROOT)))

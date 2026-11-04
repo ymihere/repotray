@@ -1,12 +1,12 @@
 # Decisions log
 
-Choices made during implementation where SPEC.md / PLAN.md left room. Newest last.
+Choices made during implementation where SPEC.md and the original build plan left room. Newest last.
 Format: date — question → choice (reason).
 
 ## Decisions
 
 - 2026-10-07 — ruff ≥ 0.15 formats Python blocks inside Markdown, which would rewrite the
-  illustrative code in SPEC/PLAN → `[tool.ruff.format] exclude = ["*.md"]` (those blocks are
+  illustrative code in SPEC → `[tool.ruff.format] exclude = ["*.md"]` (those blocks are
   documentation, not source).
 - 2026-10-07 — `ActionResult.command` holds several git calls for one action (sync = pull, abort,
   push) → one string per git command line, credentials stripped (the details dialog prints them one
@@ -27,7 +27,7 @@ Format: date — question → choice (reason).
   "pause" issued just before a due fetch wins.
 - 2026-10-07 — macOS state dir is `~/Library/Logs/repotray` (logs live there); Windows cache dir is
   `%LOCALAPPDATA%\repotray\cache`.
-- 2026-10-07 — Octicons fetched online (repo-16.svg identical to the path in PLAN §4.12; LICENSE
+- 2026-10-07 — Octicons fetched online (repo-16.svg identical to the path in the build plan; LICENSE
   says "Copyright (c) 2026 GitHub Inc.", copied verbatim).
 - 2026-10-07 — Dot circles in the build use `quad_segs=32` for the r=4 knockout (128-gon), so every
   glyph vertex stays ≥ 3.99 from a dot centre.

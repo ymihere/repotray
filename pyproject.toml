@@ -66,7 +66,6 @@ include = [
   "LICENSE",
   "CHANGELOG.md",
   "SPEC.md",
-  "PLAN.md",
 ]
 
 [tool.ruff]
@@ -75,7 +74,7 @@ target-version = "py311"
 src = ["src", "tests"]
 
 [tool.ruff.format]
-# Markdown code blocks are illustrative (SPEC/PLAN), not formatted source.
+# Markdown code blocks are illustrative (SPEC), not formatted source.
 exclude = ["*.md"]
 
 [tool.ruff.lint]

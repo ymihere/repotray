@@ -1,4 +1,4 @@
-# repotray — specification (v0.1, starting point)
+# repotray — specification
 
 A system-tray indicator that watches all locally cloned git repositories and shows,
 at a glance, how many of them have **local work** (uncommitted changes or unpushed
@@ -8,10 +8,9 @@ left, the pullable ones on the right, and one-click push / pull / sync buttons.
 Platform independent; Linux Mint Cinnamon is the first-class target and must look
 native there.
 
-Status: implemented as 0.1.0 release candidate (2026-10-07). How it is built — module
-layout, interfaces, milestones and acceptance checks — is in `PLAN.md`, which also settles
-every question this spec left open; implementation choices are logged in
-`docs/decisions.md`.
+This is the behaviour reference: change it when a decision changes. The code structure is
+described in [docs/architecture.md](docs/architecture.md); implementation choices are logged
+in [docs/decisions.md](docs/decisions.md).
 
 ---
 
@@ -122,7 +121,7 @@ The panel is the primary UI: a small undecorated popup window (not a menu, so it
 hold buttons, live progress and two columns) anchored to the tray icon. Width ≈ 480 px
 (scales with the font), height follows the content, the list scrolls beyond ~12 rows.
 It is themed by GTK with no hard-coded colours; with `panel_theme = "auto"` it follows
-the Cinnamon theme's dark/light choice (PLAN §1), so on Mint-Y-Dark it is a dark box
+the Cinnamon theme's dark/light choice, so on Mint-Y-Dark it is a dark box
 like Cinnamon's own applet popups even when the GTK theme is light. `( )` below marks a flat icon button, `[ ]` a
 labelled button.
 
@@ -242,7 +241,7 @@ where it is on its monitor. Backends without that information open it at the poi
   `git -C <path> fetch --quiet --no-write-fetch-head --recurse-submodules=no` with an
   environment that can never prompt (`GIT_TERMINAL_PROMPT=0`, `GCM_INTERACTIVE=never`,
   `GIT_SSH_COMMAND=ssh -oBatchMode=yes`, `GIT_ASKPASS=true`, editors disabled; full
-  list in PLAN §4.3). Status calls set `GIT_OPTIONAL_LOCKS=0` so they never write the
+  list in `src/repotray/core/gitrun.py`). Status calls set `GIT_OPTIONAL_LOCKS=0` so they never write the
   index. Timeout
   default 60 s, concurrency `fetch_workers` (default 4). Never touches the working
   tree or local branches. Per-repo `fetch = false` override for huge repos.
@@ -295,7 +294,7 @@ message instead of hanging.
 
 ## 5. Configuration
 TOML, created with defaults on first run, reloaded automatically when the file changes
-(checked at every status pass). Full schema with validation rules: PLAN §4.6.
+(checked at every status pass). Every key with its validation rules: [docs/configuration.md](docs/configuration.md).
 
 | Platform | Path |
 |---|---|
@@ -325,7 +324,7 @@ notifications = false
 sync_strategy = "rebase"         # or "merge": how Sync reconciles a diverged branch
 action_timeout = 120             # seconds, for push / pull / sync
 
-# {path} is substituted. Empty = auto-detect per platform (PLAN §4.10).
+# {path} is substituted. Empty = auto-detect per platform.
 terminal = ""                      # e.g. "terminator --working-directory={path}"; "" = desktop default
 file_manager = ""                  # Linux xdg-open, macOS open, Windows explorer
 editor = ""                        # config file, incoming commits; "" = desktop's text editor
@@ -379,8 +378,8 @@ orange when anything needs doing.
   theme's `warning-color` / `error-color` / `success-color`, everything else with the
   foreground colour. libst exposes exactly those CSS properties (verified in the
   binary); Mint-Y-Dark-Aqua sets `warning-color: #F27835` for some icons and libst's
-  built-in orange / red / green defaults cover the rest — confirm the rendered values
-  on the panel in M2. This is how the dots and the tint of §2.1 get their colour while
+  built-in orange / red / green defaults cover the rest (rendered values confirmed on
+  the panel). This is how the dots and the tint of §2.1 get their colour while
   the icon stays symbolic and theme-matched.
 - **Reference: Mint's own update icon** (`/usr/share/icons/hicolor/scalable/status/
   mintupdate-updates-available-symbolic.svg`, read on the dev machine): the glyph is
@@ -475,7 +474,7 @@ only its frame. The Octicons MIT notice ships in the package and appears in *Abo
 
 ## 7. Architecture
 
-The authoritative module layout, data types and interfaces are in PLAN §3–§4. In short:
+Module layout and interfaces: [docs/architecture.md](docs/architecture.md). In short:
 
 - **core** (stdlib only): scanner, git runner, porcelain parser, actions, scheduler, and
   pure functions that turn a `Snapshot` into an `IconSpec`, label, tooltip and
@@ -501,10 +500,10 @@ the xapp-status applet fills `x, y` with the icon's screen edge adjacent to the 
 (from the actor allocation, divided by `ui_scale`) and `panel_position` with a
 `Gtk.PositionType`. `activate(button, time)` carries no position. So: leave the
 primary menu unset, open the panel from the release event for button 1, keep
-`set_secondary_menu` for button 3. (M2 confirms that the release signal fires for
-button 1 with no primary menu bound; the applet forwards every click.) The panel is a
+`set_secondary_menu` for button 3. (The release signal fires for button 1 with no
+primary menu bound; the applet forwards every click.) The panel is a
 `Gtk.Window`: undecorated, skip-taskbar, keep-above, not override-redirect so it can
-take keyboard focus; exact type hint settled in M2.
+take keyboard focus (type hint: see docs/decisions.md).
 
 **Recommended stack: Python ≥ 3.11** (stdlib `tomllib`, `subprocess`,
 `concurrent.futures`). Rationale: PyGObject with XApp and AppIndicator typelibs is
@@ -549,7 +548,7 @@ repotray quit                    stop the running tray
 repotray --config PATH  --backend NAME  --verbose  --version
 ```
 `status`, `scan`, `doctor` and the action commands make the core testable and useful
-without any GUI. Exit codes and the JSON schema: PLAN §4.14.
+without any GUI. Exit codes and the JSON schema: [docs/cli.md](docs/cli.md).
 
 ## 9. Testing
 - Unit tests for the porcelain-v2 parser with fixtures: clean, staged, unstaged,
@@ -584,7 +583,7 @@ auto-pull; stash tracking; multiple remotes beyond the upstream; submodule recur
 by default; filesystem event watching; packaging for distros.
 
 ## 11. Decisions on former open questions
-All settled on 2026-10-05; details in PLAN §1.
+All settled on 2026-10-05.
 - Label counts **repos**, never commits.
 - Sync = `git pull --rebase` then `git push`; `merge` is the only alternative.
 - Hidden directories are never discovered; a hidden directory can be a root or a
@@ -596,8 +595,3 @@ All settled on 2026-10-05; details in PLAN §1.
   the top porting opportunity. Windows has the full panel through the `qt` backend
   (2026-10-07; it replaced the pystray menu fallback there).
 - Licence MIT.
-
-## 12. Milestones
-M0 skeleton · M1 headless core + CLI · M2 icons · M3 Cinnamon backend + panel ·
-M4 other backends and platforms · M5 docs, scripts, CI, packaging · M6 final acceptance
-and hand-off. Deliverables and acceptance checks: PLAN §5.

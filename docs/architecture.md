@@ -1,6 +1,7 @@
 # Architecture
 
-The authoritative design is in [PLAN.md](../PLAN.md) §3–§4; this page is the overview.
+How the code is organised. Behaviour is specified in [SPEC.md](../SPEC.md); implementation
+choices are logged in [decisions.md](decisions.md).
 
 ## Layers
 
